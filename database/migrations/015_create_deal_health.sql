@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS deal_health (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL UNIQUE,
+  health_score INT NOT NULL DEFAULT 100,
+  status ENUM('HEALTHY', 'WATCH', 'AT_RISK', 'CRITICAL') NOT NULL DEFAULT 'HEALTHY',
+  quotation_age_days INT NOT NULL DEFAULT 0,
+  approval_delay_hours INT NOT NULL DEFAULT 0,
+  discount_risk_level ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') DEFAULT 'LOW',
+  fulfillment_risk_level ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') DEFAULT 'LOW',
+  payment_status VARCHAR(50) DEFAULT 'CURRENT',
+  reasons_json JSON NULL,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

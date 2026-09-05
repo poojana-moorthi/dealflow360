@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS price_lists (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NOT NULL,
+  customer_tier ENUM('BRONZE', 'SILVER', 'GOLD', 'ENTERPRISE') NOT NULL,
+  price DECIMAL(14, 2) NOT NULL,
+  currency VARCHAR(10) DEFAULT 'INR',
+  effective_date DATE NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_prod_tier (product_id, customer_tier)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

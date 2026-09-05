@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS products (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  sku VARCHAR(100) NOT NULL UNIQUE,
+  category ENUM('Hardware', 'Services', 'Subscriptions') NOT NULL,
+  description TEXT NULL,
+  unit VARCHAR(50) DEFAULT 'Unit',
+  price DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  cost DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  tax_rate DECIMAL(5, 2) NOT NULL DEFAULT 18.00,
+  billing_type ENUM('ONE_TIME', 'RECURRING', 'BOTH') NOT NULL DEFAULT 'ONE_TIME',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_products_category (category),
+  INDEX idx_products_sku (sku)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

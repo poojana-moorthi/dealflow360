@@ -1,0 +1,29 @@
+CREATE TABLE IF NOT EXISTS approvals (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL,
+  assigned_to_role ENUM('SALES_MANAGER', 'FINANCE', 'ADMIN') NOT NULL,
+  reviewer_id INT NULL,
+  status ENUM('PENDING', 'APPROVED', 'REJECTED', 'REVISION_REQUIRED') NOT NULL DEFAULT 'PENDING',
+  reason VARCHAR(255) NULL,
+  notes TEXT NULL,
+  action_timestamp DATETIME NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (reviewer_id) REFERENCES users(id),
+  INDEX idx_approval_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS approval_audits (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  approval_id INT NULL,
+  quotation_id INT NOT NULL,
+  user_id INT NOT NULL,
+  action VARCHAR(50) NOT NULL,
+  old_value VARCHAR(100) NULL,
+  new_value VARCHAR(100) NULL,
+  reason TEXT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

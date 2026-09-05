@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS inventory (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NOT NULL,
+  warehouse_id INT NOT NULL,
+  quantity INT NOT NULL DEFAULT 0,
+  reserved_quantity INT NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (warehouse_id) REFERENCES warehouses(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_prod_wh (product_id, warehouse_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

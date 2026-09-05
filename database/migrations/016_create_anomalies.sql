@@ -1,0 +1,48 @@
+CREATE TABLE IF NOT EXISTS anomalies (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL,
+  anomaly_type ENUM('STALLED_DEAL', 'UNUSUAL_DISCOUNT', 'REPEATED_OVERRIDE', 'DELIVERY_SLIPPAGE', 'MARGIN_EROSION') NOT NULL,
+  severity ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') NOT NULL DEFAULT 'MEDIUM',
+  description TEXT NOT NULL,
+  detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  resolved BOOLEAN DEFAULT FALSE,
+  resolved_at DATETIME NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS upsell_rules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  trigger_product_id INT NOT NULL,
+  recommended_product_id INT NOT NULL,
+  reason VARCHAR(255) NOT NULL,
+  discount_incentive_pct DECIMAL(5, 2) DEFAULT 0.00,
+  min_cart_value DECIMAL(14, 2) DEFAULT 0.00,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (trigger_product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (recommended_product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NULL,
+  role ENUM('ADMIN', 'SALES_REP', 'SALES_MANAGER', 'FINANCE', 'OPERATIONS', 'CUSTOMER') NULL,
+  title VARCHAR(200) NOT NULL,
+  message TEXT NOT NULL,
+  link VARCHAR(255) NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NULL,
+  role VARCHAR(50) NULL,
+  action VARCHAR(100) NOT NULL,
+  entity VARCHAR(100) NOT NULL,
+  entity_id INT NULL,
+  reason TEXT NULL,
+  metadata_json JSON NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_action (action),
+  INDEX idx_audit_entity (entity, entity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
