@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { useSales } from '../../context/SalesContext';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
 import {
@@ -20,8 +21,11 @@ import {
 } from 'lucide-react';
 
 export function SalesDashboard() {
+  const { user } = useAuth();
   const { persona, dashboardSummary, quotations, approvals, auditEvents } = useSales();
   const navigate = useNavigate();
+
+  const currentRole = user?.role || persona?.role || 'SALES_REP';
 
   const metrics = dashboardSummary.metrics;
   const healthCounts = dashboardSummary.dealHealthCounts;
@@ -62,13 +66,20 @@ export function SalesDashboard() {
     );
   };
 
+  const getGreetingName = () => {
+    if (currentRole === 'ADMIN') return 'System Administrator';
+    if (currentRole === 'SALES_MANAGER') return 'Sarah Connor (Sales Director)';
+    if (currentRole === 'FINANCE') return 'David Miller (VP Finance)';
+    return 'Alex Morgan (Senior Sales Executive)';
+  };
+
   return (
     <div className="space-y-6">
       {/* 3. Header matching specification */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Good morning, {persona.label || persona.role === 'SALES_REP' ? 'Sales Rep' : persona.name}
+            Good morning, {getGreetingName()}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Here's what's happening with your pipeline today.
@@ -76,21 +87,25 @@ export function SalesDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            to="/quotations/new"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1565C0] text-white text-xs font-bold rounded-md hover:bg-[#0D47A1] transition shadow-xs"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>+ Create Quotation</span>
-          </Link>
+          {['ADMIN', 'SALES_REP', 'SALES_MANAGER'].includes(currentRole) && (
+            <Link
+              to="/quotations/new"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1565C0] text-white text-xs font-bold rounded-md hover:bg-[#0D47A1] transition shadow-xs"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ Create Quotation</span>
+            </Link>
+          )}
 
-          <Link
-            to="/approvals"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white text-slate-700 text-xs font-bold rounded-md border border-slate-300 hover:bg-slate-50 transition shadow-xs"
-          >
-            <CheckSquare className="w-4 h-4 text-amber-600" />
-            <span>Approvals ({metrics.pendingApprovals})</span>
-          </Link>
+          {['ADMIN', 'SALES_MANAGER', 'FINANCE'].includes(currentRole) && (
+            <Link
+              to="/approvals"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white text-slate-700 text-xs font-bold rounded-md border border-slate-300 hover:bg-slate-50 transition shadow-xs"
+            >
+              <CheckSquare className="w-4 h-4 text-amber-600" />
+              <span>Approvals ({metrics.pendingApprovals})</span>
+            </Link>
+          )}
         </div>
       </div>
 

@@ -1,8 +1,11 @@
--- DealFlow360 Phase 1 Database Schema (Authentication & Users)
+-- DealFlow360 Database Schema
+-- Self-Governing B2B Sales Operations Platform
+-- Target Database: MySQL 8.0+
+
 CREATE DATABASE IF NOT EXISTS dealflow360 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE dealflow360;
 
--- 1. USERS TABLE
+-- 1. USERS
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
@@ -18,7 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX idx_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 2. CUSTOMERS TABLE (Referenced by customer accounts)
+-- 2. CUSTOMERS
 CREATE TABLE IF NOT EXISTS customers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   company_name VARCHAR(200) NOT NULL,
@@ -36,7 +39,354 @@ CREATE TABLE IF NOT EXISTS customers (
   INDEX idx_customers_tier (tier)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. AUDIT LOGS TABLE
+-- 3. PRODUCTS
+CREATE TABLE IF NOT EXISTS products (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  sku VARCHAR(100) NOT NULL UNIQUE,
+  category ENUM('Hardware', 'Services', 'Subscriptions') NOT NULL,
+  description TEXT NULL,
+  unit VARCHAR(50) DEFAULT 'Unit',
+  price DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  cost DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  tax_rate DECIMAL(5, 2) NOT NULL DEFAULT 18.00,
+  billing_type ENUM('ONE_TIME', 'RECURRING', 'BOTH') NOT NULL DEFAULT 'ONE_TIME',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_products_category (category),
+  INDEX idx_products_sku (sku)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. PRICE LISTS (Tier Pricing)
+CREATE TABLE IF NOT EXISTS price_lists (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NOT NULL,
+  customer_tier ENUM('BRONZE', 'SILVER', 'GOLD', 'ENTERPRISE') NOT NULL,
+  price DECIMAL(14, 2) NOT NULL,
+  currency VARCHAR(10) DEFAULT 'INR',
+  effective_date DATE NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_prod_tier (product_id, customer_tier)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 5. DISCOUNT GOVERNANCE RULES
+CREATE TABLE IF NOT EXISTS discount_rules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  customer_tier ENUM('BRONZE', 'SILVER', 'GOLD', 'ENTERPRISE') NOT NULL,
+  product_category ENUM('Hardware', 'Services', 'Subscriptions') NOT NULL,
+  max_discount_pct DECIMAL(5, 2) NOT NULL,
+  required_approval_level ENUM('SALES_REP', 'SALES_MANAGER', 'FINANCE') NOT NULL DEFAULT 'SALES_MANAGER',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_tier_cat (customer_tier, product_category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 6. WAREHOUSES
+CREATE TABLE IF NOT EXISTS warehouses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  location VARCHAR(150) NOT NULL,
+  priority INT DEFAULT 1,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 7. INVENTORY
+CREATE TABLE IF NOT EXISTS inventory (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NOT NULL,
+  warehouse_id INT NOT NULL,
+  quantity INT NOT NULL DEFAULT 0,
+  reserved_quantity INT NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (warehouse_id) REFERENCES warehouses(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_prod_wh (product_id, warehouse_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 8. QUOTATIONS
+CREATE TABLE IF NOT EXISTS quotations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_number VARCHAR(100) NOT NULL UNIQUE,
+  customer_id INT NOT NULL,
+  user_id INT NOT NULL,
+  status ENUM(
+    'DRAFT',
+    'PENDING_APPROVAL',
+    'APPROVED',
+    'REJECTED',
+    'REVISION_REQUIRED',
+    'RE_APPROVAL_REQUIRED',
+    'SENT',
+    'NEGOTIATION',
+    'CONFIRMED',
+    'FULFILLING',
+    'COMPLETED',
+    'CANCELLED'
+  ) NOT NULL DEFAULT 'DRAFT',
+  subtotal DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  total_discount DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  tax_amount DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  total_amount DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  total_cost DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  gross_profit DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  gross_margin_pct DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+  risk_score INT NOT NULL DEFAULT 0,
+  risk_level ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') NOT NULL DEFAULT 'LOW',
+  approval_required BOOLEAN DEFAULT FALSE,
+  required_approval_level VARCHAR(50) DEFAULT 'NONE',
+  risk_reasons JSON NULL,
+  notes TEXT NULL,
+  valid_until DATE NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_quote_status (status),
+  INDEX idx_quote_number (quotation_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 9. QUOTATION ITEMS
+CREATE TABLE IF NOT EXISTS quotation_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL,
+  product_id INT NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  unit_price DECIMAL(14, 2) NOT NULL,
+  unit_cost DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  discount_pct DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+  discount_amount DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  line_total DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  line_margin_pct DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+  billing_type ENUM('ONE_TIME', 'RECURRING', 'BOTH') NOT NULL DEFAULT 'ONE_TIME',
+  billing_frequency ENUM('ONE_TIME', 'MONTHLY', 'QUARTERLY', 'YEARLY') NOT NULL DEFAULT 'ONE_TIME',
+  risk_flag BOOLEAN DEFAULT FALSE,
+  risk_reason VARCHAR(255) NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 10. APPROVALS
+CREATE TABLE IF NOT EXISTS approvals (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL,
+  assigned_to_role ENUM('SALES_MANAGER', 'FINANCE', 'ADMIN') NOT NULL,
+  reviewer_id INT NULL,
+  status ENUM('PENDING', 'APPROVED', 'REJECTED', 'REVISION_REQUIRED') NOT NULL DEFAULT 'PENDING',
+  reason VARCHAR(255) NULL,
+  notes TEXT NULL,
+  action_timestamp DATETIME NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (reviewer_id) REFERENCES users(id),
+  INDEX idx_approval_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 11. APPROVAL AUDITS
+CREATE TABLE IF NOT EXISTS approval_audits (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  approval_id INT NULL,
+  quotation_id INT NOT NULL,
+  user_id INT NOT NULL,
+  action VARCHAR(50) NOT NULL,
+  old_value VARCHAR(100) NULL,
+  new_value VARCHAR(100) NULL,
+  reason TEXT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 12. FULFILLMENT ALLOCATIONS
+CREATE TABLE IF NOT EXISTS fulfillment_allocations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL,
+  product_id INT NOT NULL,
+  warehouse_id INT NOT NULL,
+  quantity INT NOT NULL,
+  backorder_quantity INT NOT NULL DEFAULT 0,
+  is_override BOOLEAN DEFAULT FALSE,
+  override_by INT NULL,
+  override_reason TEXT NULL,
+  status ENUM('ALLOCATED', 'DISPATCHED', 'DELIVERED', 'CANCELLED') DEFAULT 'ALLOCATED',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+  FOREIGN KEY (override_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 13. SUBSCRIPTIONS
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  subscription_number VARCHAR(100) NOT NULL UNIQUE,
+  customer_id INT NOT NULL,
+  quotation_id INT NOT NULL,
+  product_id INT NOT NULL,
+  plan_name VARCHAR(150) NOT NULL,
+  frequency ENUM('MONTHLY', 'QUARTERLY', 'YEARLY') NOT NULL,
+  unit_price DECIMAL(14, 2) NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  subtotal DECIMAL(14, 2) NOT NULL,
+  start_date DATE NOT NULL,
+  next_billing_date DATE NOT NULL,
+  end_date DATE NULL,
+  status ENUM('ACTIVE', 'PAUSED', 'CANCELLED') NOT NULL DEFAULT 'ACTIVE',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id),
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id),
+  FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 14. BILLING SCHEDULES
+CREATE TABLE IF NOT EXISTS billing_schedules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  subscription_id INT NOT NULL,
+  quotation_id INT NOT NULL,
+  schedule_date DATE NOT NULL,
+  due_date DATE NOT NULL,
+  amount DECIMAL(14, 2) NOT NULL,
+  status ENUM('SCHEDULED', 'INVOICED', 'PAID', 'OVERDUE') NOT NULL DEFAULT 'SCHEDULED',
+  invoice_id INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 15. INVOICES
+CREATE TABLE IF NOT EXISTS invoices (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  invoice_number VARCHAR(100) NOT NULL UNIQUE,
+  customer_id INT NOT NULL,
+  quotation_id INT NOT NULL,
+  invoice_date DATE NOT NULL,
+  due_date DATE NOT NULL,
+  subtotal DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  discount DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  tax DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  total DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  amount_paid DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+  status ENUM('DRAFT', 'SENT', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED') NOT NULL DEFAULT 'DRAFT',
+  payment_status ENUM('UNPAID', 'PARTIALLY_PAID', 'PAID') NOT NULL DEFAULT 'UNPAID',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id),
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 16. INVOICE ITEMS
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  invoice_id INT NOT NULL,
+  product_id INT NULL,
+  description VARCHAR(255) NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  unit_price DECIMAL(14, 2) NOT NULL,
+  line_total DECIMAL(14, 2) NOT NULL,
+  billing_type ENUM('ONE_TIME', 'RECURRING') NOT NULL DEFAULT 'ONE_TIME',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 17. PAYMENTS
+CREATE TABLE IF NOT EXISTS payments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  invoice_id INT NOT NULL,
+  amount DECIMAL(14, 2) NOT NULL,
+  payment_date DATE NOT NULL,
+  payment_method ENUM('NEFT', 'RTGS', 'UPI', 'CREDIT_CARD', 'BANK_TRANSFER', 'CHEQUE') NOT NULL DEFAULT 'BANK_TRANSFER',
+  transaction_reference VARCHAR(100) NOT NULL,
+  status ENUM('SUCCESS', 'FAILED', 'PENDING') NOT NULL DEFAULT 'SUCCESS',
+  notes TEXT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18. NEGOTIATIONS
+CREATE TABLE IF NOT EXISTS negotiations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL,
+  user_id INT NOT NULL,
+  role ENUM('CUSTOMER', 'SALES_REP', 'SALES_MANAGER', 'ADMIN') NOT NULL,
+  message_type ENUM('COMMENT', 'COUNTER_OFFER', 'CHANGE_REQUEST', 'SYSTEM_NOTIFICATION') NOT NULL,
+  counter_price DECIMAL(14, 2) NULL,
+  counter_discount_pct DECIMAL(5, 2) NULL,
+  comment TEXT NOT NULL,
+  line_changes_json JSON NULL,
+  status ENUM('OPEN', 'ACCEPTED', 'REJECTED', 'SUPERSEDED') DEFAULT 'OPEN',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 19. DEAL HEALTH
+CREATE TABLE IF NOT EXISTS deal_health (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL UNIQUE,
+  health_score INT NOT NULL DEFAULT 100,
+  status ENUM('HEALTHY', 'WATCH', 'AT_RISK', 'CRITICAL') NOT NULL DEFAULT 'HEALTHY',
+  quotation_age_days INT NOT NULL DEFAULT 0,
+  approval_delay_hours INT NOT NULL DEFAULT 0,
+  discount_risk_level ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') DEFAULT 'LOW',
+  fulfillment_risk_level ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') DEFAULT 'LOW',
+  payment_status VARCHAR(50) DEFAULT 'CURRENT',
+  reasons_json JSON NULL,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 20. ANOMALIES
+CREATE TABLE IF NOT EXISTS anomalies (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quotation_id INT NOT NULL,
+  anomaly_type ENUM('STALLED_DEAL', 'UNUSUAL_DISCOUNT', 'REPEATED_OVERRIDE', 'DELIVERY_SLIPPAGE', 'MARGIN_EROSION') NOT NULL,
+  severity ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') NOT NULL DEFAULT 'MEDIUM',
+  description TEXT NOT NULL,
+  detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  resolved BOOLEAN DEFAULT FALSE,
+  resolved_at DATETIME NULL,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 21. UPSELL RULES
+CREATE TABLE IF NOT EXISTS upsell_rules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  trigger_product_id INT NOT NULL,
+  recommended_product_id INT NOT NULL,
+  reason VARCHAR(255) NOT NULL,
+  discount_incentive_pct DECIMAL(5, 2) DEFAULT 0.00,
+  min_cart_value DECIMAL(14, 2) DEFAULT 0.00,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (trigger_product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (recommended_product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 22. NOTIFICATIONS
+CREATE TABLE IF NOT EXISTS notifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NULL,
+  role ENUM('ADMIN', 'SALES_REP', 'SALES_MANAGER', 'FINANCE', 'OPERATIONS', 'CUSTOMER') NULL,
+  title VARCHAR(200) NOT NULL,
+  message TEXT NOT NULL,
+  link VARCHAR(255) NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 23. AUDIT LOGS
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NULL,
@@ -47,6 +397,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   reason TEXT NULL,
   metadata_json JSON NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_audit_user (user_id),
-  INDEX idx_audit_action (action)
+  INDEX idx_audit_action (action),
+  INDEX idx_audit_entity (entity, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
