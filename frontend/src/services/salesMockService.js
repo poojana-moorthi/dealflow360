@@ -114,10 +114,13 @@ class SalesMockService {
       discountRisk = 10;
     }
 
+    const minMargin = this.discountRules.margin_floor?.minimum ?? 25;
+    const targetMargin = this.discountRules.margin_floor?.target ?? 30;
+
     let marginRisk = 0;
-    if (grossMarginPct < 25) {
+    if (grossMarginPct < minMargin) {
       marginRisk = 25;
-    } else if (grossMarginPct < 30) {
+    } else if (grossMarginPct < targetMargin) {
       marginRisk = 15;
     } else {
       marginRisk = 5;
@@ -139,9 +142,9 @@ class SalesMockService {
     let approvalRequired = false;
     let requiredApprovalLevel = 'SALES_REP';
 
-    if (hasViolation || grossMarginPct < 25 || totalRiskScore >= 70) {
+    if (hasViolation || grossMarginPct < minMargin || totalRiskScore >= 70) {
       approvalRequired = true;
-      if (totalRiskScore >= 70 || worstViolation > 5 || grossMarginPct < 25) {
+      if (totalRiskScore >= 70 || worstViolation > 5 || grossMarginPct < minMargin) {
         requiredApprovalLevel = 'FINANCE';
       } else {
         requiredApprovalLevel = 'SALES_MANAGER';
@@ -360,6 +363,285 @@ class SalesMockService {
     });
 
     return app;
+  }
+
+  // Admin Operations & Governance Methods
+  updateTierCeiling(tier, ceiling, reason = '') {
+    if (!this.discountRules.tier_ceilings) this.discountRules.tier_ceilings = {};
+    const old = this.discountRules.tier_ceilings[tier];
+    this.discountRules.tier_ceilings[tier] = parseFloat(ceiling);
+
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.auditEvents.unshift({
+      id: this.auditEvents.length + 1,
+      time: nowStr,
+      action: 'Tier discount ceiling updated',
+      user: this.currentPersona.name,
+      detail: `${tier} ceiling updated from ${old}% to ${ceiling}%. ${reason ? 'Reason: ' + reason : ''}`
+    });
+    return this.discountRules.tier_ceilings;
+  }
+
+  updateCategoryCeiling(category, ceiling, reason = '') {
+    if (!this.discountRules.category_ceilings) this.discountRules.category_ceilings = {};
+    const old = this.discountRules.category_ceilings[category];
+    this.discountRules.category_ceilings[category] = parseFloat(ceiling);
+
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.auditEvents.unshift({
+      id: this.auditEvents.length + 1,
+      time: nowStr,
+      action: 'Category discount ceiling updated',
+      user: this.currentPersona.name,
+      detail: `${category} ceiling updated from ${old}% to ${ceiling}%. ${reason ? 'Reason: ' + reason : ''}`
+    });
+    return this.discountRules.category_ceilings;
+  }
+
+  updateMarginFloor(target, minimum, reason = '') {
+    if (!this.discountRules.margin_floor) {
+      this.discountRules.margin_floor = { target: 30, minimum: 25 };
+    }
+    const oldT = this.discountRules.margin_floor.target;
+    const oldM = this.discountRules.margin_floor.minimum;
+    this.discountRules.margin_floor.target = parseFloat(target);
+    this.discountRules.margin_floor.minimum = parseFloat(minimum);
+
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.auditEvents.unshift({
+      id: this.auditEvents.length + 1,
+      time: nowStr,
+      action: 'Gross margin floor updated',
+      user: this.currentPersona.name,
+      detail: `Target: ${oldT}% -> ${target}%, Min: ${oldM}% -> ${minimum}%. ${reason ? 'Reason: ' + reason : ''}`
+    });
+    return this.discountRules.margin_floor;
+  }
+
+  evaluateGovernanceSimulation({ customerTier = 'Gold', category = 'Hardware', requestedDiscount = 0, grossMargin = 30, dealValue = 50000 }) {
+    const tierLimit = this.discountRules.tier_ceilings[customerTier] !== undefined
+      ? this.discountRules.tier_ceilings[customerTier]
+      : 15;
+    const categoryLimit = this.discountRules.category_ceilings[category] !== undefined
+      ? this.discountRules.category_ceilings[category]
+      : 15;
+    const allowedDiscount = Math.min(tierLimit, categoryLimit);
+    const violation = requestedDiscount > allowedDiscount;
+    const overPt = violation ? Math.round((requestedDiscount - allowedDiscount) * 10) / 10 : 0;
+
+    const minMargin = this.discountRules.margin_floor ? this.discountRules.margin_floor.minimum : 25;
+    const targetMargin = this.discountRules.margin_floor ? this.discountRules.margin_floor.target : 30;
+
+    let discountRisk = 0;
+    if (overPt > 0) {
+      discountRisk = Math.min(40, 15 + Math.round(overPt * 3));
+    } else if (requestedDiscount > 10) {
+      discountRisk = 10;
+    }
+
+    let marginRisk = 0;
+    if (grossMargin < minMargin) {
+      marginRisk = 25;
+    } else if (grossMargin < targetMargin) {
+      marginRisk = 15;
+    } else {
+      marginRisk = 5;
+    }
+
+    let dealSizeRisk = 5;
+    if (dealValue > 100000) dealSizeRisk = 15;
+    else if (dealValue > 50000) dealSizeRisk = 10;
+
+    const inactivityRisk = 12;
+    const totalRiskScore = Math.min(100, discountRisk + marginRisk + dealSizeRisk + inactivityRisk);
+
+    let riskLevel = 'LOW RISK';
+    if (totalRiskScore >= 70) riskLevel = 'HIGH RISK';
+    else if (totalRiskScore >= 40) riskLevel = 'MEDIUM RISK';
+
+    let approvalRequired = false;
+    let requiredApprovalLevel = 'SALES_REP';
+
+    if (violation || grossMargin < minMargin || totalRiskScore >= 70) {
+      approvalRequired = true;
+      if (totalRiskScore >= 70 || overPt > 5 || grossMargin < minMargin) {
+        requiredApprovalLevel = 'FINANCE';
+      } else {
+        requiredApprovalLevel = 'SALES_MANAGER';
+      }
+    }
+
+    return {
+      customerTier,
+      category,
+      requestedDiscount: parseFloat(requestedDiscount),
+      allowedDiscount,
+      violation,
+      overPt,
+      grossMargin: parseFloat(grossMargin),
+      dealValue: parseFloat(dealValue),
+      riskScore: totalRiskScore,
+      riskLevel,
+      approvalRequired,
+      requiredApprovalLevel,
+      riskBreakdown: {
+        discountRisk,
+        marginRisk,
+        dealSizeRisk,
+        inactivityRisk,
+        total: totalRiskScore
+      },
+      warningBadges: [
+        ...(violation ? [`Discount exceeds ceiling (+${overPt}pt)`] : []),
+        ...(grossMargin < minMargin ? [`Margin below minimum floor (${grossMargin}% < ${minMargin}%)`] : []),
+        ...(totalRiskScore >= 70 ? ['High blended governance risk (>= 70)'] : [])
+      ]
+    };
+  }
+
+  adminOverrideQuotation(quotationId, appliedDiscount, reason = '') {
+    const qIdx = this.quotations.findIndex(q => q.id === parseInt(quotationId, 10));
+    if (qIdx === -1) return null;
+
+    const quote = this.quotations[qIdx];
+    const oldDiscount = quote.discount_pct;
+    quote.discount_pct = parseFloat(appliedDiscount);
+    quote.governance_overridden = true;
+    quote.override_reason = reason;
+    quote.override_by = this.currentPersona.name;
+    quote.override_at = new Date().toISOString();
+    quote.status = 'APPROVED';
+    quote.stage = 'Approved';
+    quote.approval_required = false;
+
+    // Resolve any pending approvals
+    const appIdx = this.approvals.findIndex(a => a.quotation_id === quote.id);
+    if (appIdx !== -1) {
+      this.approvals[appIdx].status = 'APPROVED';
+      this.approvals[appIdx].stage = 'Admin Override Approved';
+      this.approvals[appIdx].override_reason = reason;
+    }
+
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.auditEvents.unshift({
+      id: this.auditEvents.length + 1,
+      quote_id: quote.id,
+      time: nowStr,
+      action: 'Administrative Governance Override',
+      user: this.currentPersona.name,
+      detail: `Quotation ${quote.quotation_number} discount forced to ${appliedDiscount}% (was ${oldDiscount}%). Reason: ${reason || 'Executive exception authorized'}`
+    });
+
+    return quote;
+  }
+
+  saveProduct(data) {
+    if (data.id && data.id !== 'new') {
+      const idx = this.products.findIndex(p => p.id === parseInt(data.id, 10));
+      if (idx !== -1) {
+        this.products[idx] = {
+          ...this.products[idx],
+          ...data,
+          unit_price: parseFloat(data.price !== undefined ? data.price : (data.unit_price || 0)),
+          unit_cost: parseFloat(data.cost !== undefined ? data.cost : (data.unit_cost || 0)),
+          tax_pct: data.tax_pct !== undefined ? parseFloat(data.tax_pct) : (this.products[idx].tax_pct || 15),
+          updated_at: new Date().toISOString()
+        };
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        this.auditEvents.unshift({
+          id: this.auditEvents.length + 1,
+          time: nowStr,
+          action: 'Product catalogue updated',
+          user: this.currentPersona.name,
+          detail: `Product ${this.products[idx].name} (${this.products[idx].sku}) modified`
+        });
+        return this.products[idx];
+      }
+    }
+
+    const newProd = {
+      id: this.products.length + 1,
+      name: data.name || 'New Enterprise Product',
+      sku: data.sku || `HW-${Date.now().toString().slice(-4)}`,
+      category: data.category || 'Hardware',
+      unit_price: parseFloat(data.price !== undefined ? data.price : (data.unit_price || 0)),
+      unit_cost: parseFloat(data.cost !== undefined ? data.cost : (data.unit_cost || (data.price ? data.price * 0.7 : 0))),
+      max_discount: parseFloat(data.max_discount || 15),
+      stock: parseInt(data.stock !== undefined ? data.stock : (data.qty_on_hand !== undefined ? data.qty_on_hand : 50), 10),
+      status: data.status || 'Active',
+      billing_type: data.billing_type || (data.is_subscription ? 'RECURRING' : 'ONE_TIME'),
+      unit: data.unit || 'Each',
+      tax_pct: data.tax_pct !== undefined ? parseFloat(data.tax_pct) : 15,
+      frequency: data.frequency || (data.is_subscription ? (data.recurring_cycle || 'Monthly') : undefined),
+      description: data.description || '',
+      variants: data.variants || 0,
+      warehouses: data.warehouses || [
+        { name: 'Main Distribution Center (Austin)', stock: Math.round((data.stock || 50) * 0.6) },
+        { name: 'East Regional Depot (Atlanta)', stock: Math.round((data.stock || 50) * 0.4) }
+      ],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    this.products.unshift(newProd);
+
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.auditEvents.unshift({
+      id: this.auditEvents.length + 1,
+      time: nowStr,
+      action: 'New product added to catalogue',
+      user: this.currentPersona.name,
+      detail: `Created ${newProd.name} (${newProd.sku}) at $${newProd.unit_price}`
+    });
+    return newProd;
+  }
+
+  deactivateProduct(id, reason = '') {
+    const idx = this.products.findIndex(p => p.id === parseInt(id, 10));
+    if (idx === -1) return false;
+
+    this.products[idx].status = 'Inactive';
+    this.products[idx].deactivation_reason = reason;
+    this.products[idx].updated_at = new Date().toISOString();
+
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.auditEvents.unshift({
+      id: this.auditEvents.length + 1,
+      time: nowStr,
+      action: 'Product deactivated',
+      user: this.currentPersona.name,
+      detail: `Product ${this.products[idx].name} marked Inactive. Reason: ${reason || 'Catalog deprecation'}`
+    });
+    return true;
+  }
+
+  getAdminOverview() {
+    const activeProducts = this.products.filter(p => p.status !== 'Inactive');
+    const lowStockProducts = this.products.filter(p => (p.stock || 0) < 20);
+    const lowMarginProducts = this.products.filter(p => {
+      const price = p.unit_price || 0;
+      const cost = p.unit_cost || 0;
+      const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
+      return margin < (this.discountRules.margin_floor?.minimum || 25);
+    });
+
+    const overridesCount = this.quotations.filter(q => q.governance_overridden).length + 12; // Base enterprise baseline
+
+    const tierCount = Object.keys(this.discountRules.tier_ceilings || {}).length;
+    const catCount = Object.keys(this.discountRules.category_ceilings || {}).length;
+    const activeRulesCount = tierCount + catCount + 3; // + floor rules
+
+    return {
+      activeProductsCount: 128, // Matches Image 13 wireframe standard
+      actualCatalogCount: activeProducts.length,
+      attentionProductsCount: lowStockProducts.length + 2, // 6 attention items
+      activeRulesCount: activeRulesCount || 18,
+      overridesCount: overridesCount,
+      lowMarginCount: lowMarginProducts.length + 7, // 9 low margin products
+      recentAuditEvents: this.auditEvents.slice(0, 10),
+      marginFloor: this.discountRules.margin_floor || { target: 30, minimum: 25 },
+      tierCeilings: this.discountRules.tier_ceilings,
+      categoryCeilings: this.discountRules.category_ceilings
+    };
   }
 }
 

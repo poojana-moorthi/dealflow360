@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader } from '../components/common/Card';
+import AccessRestricted from '../pages/admin/AccessRestricted';
 
 export function ProtectedRoute({ children, allowedRoles = [] }) {
   const { user, token, loading } = useAuth();
@@ -22,14 +23,8 @@ export function ProtectedRoute({ children, allowedRoles = [] }) {
 
   // If internal user trying to access restricted admin/finance routes
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return (
-      <div className="p-8 text-center bg-white rounded-lg border border-slate-200">
-        <h3 className="text-base font-bold text-slate-900">Access Restricted</h3>
-        <p className="text-xs text-slate-500 mt-1">
-          Your role ({user.role}) does not have permission to view this section.
-        </p>
-      </div>
-    );
+    const requiredRole = allowedRoles.includes('ADMIN') ? 'Administrator' : allowedRoles.join(' or ');
+    return <AccessRestricted requiredRole={requiredRole} />;
   }
 
   return children;

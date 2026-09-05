@@ -8,6 +8,10 @@ router.use(authenticateToken);
 
 router.get('/', subscriptionController.getSubscriptions);
 router.get('/:id', subscriptionController.getSubscriptionById);
-router.put('/:id', authorizeRoles('ADMIN', 'FINANCE'), subscriptionController.updateSubscriptionStatus);
+router.put(
+  '/:id',
+  authorizeRoles('ADMIN', 'FINANCE'),
+  subscriptionController.updateSubscriptionStatus
+);
 
 module.exports = router;

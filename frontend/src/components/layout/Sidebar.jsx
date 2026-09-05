@@ -20,16 +20,19 @@ export function Sidebar() {
   const role = user?.role || 'SALES_REP';
 
   const navItems = [
-    { label: 'Sales Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'SALES_REP', 'SALES_MANAGER', 'FINANCE', 'OPERATIONS'] },
+    { label: 'Sales Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'SALES_REP', 'SALES_MANAGER', 'OPERATIONS'] },
+    { label: 'Finance Command Center', path: '/finance', icon: Receipt, roles: ['ADMIN', 'FINANCE'] },
     { label: 'Quotations', path: '/quotations', icon: FileText, roles: ['ADMIN', 'SALES_REP', 'SALES_MANAGER'] },
     { label: 'Approval Queue', path: '/approvals', icon: CheckCircle2, roles: ['ADMIN', 'SALES_MANAGER', 'FINANCE'] },
     { label: 'Fulfillment & Stock', path: '/fulfillment/1', icon: Package, roles: ['ADMIN', 'OPERATIONS', 'SALES_MANAGER'] },
-    { label: 'Subscriptions', path: '/subscriptions', icon: Repeat, roles: ['ADMIN', 'FINANCE', 'SALES_REP'] },
-    { label: 'Invoices & Payments', path: '/invoices', icon: Receipt, roles: ['ADMIN', 'FINANCE', 'SALES_REP'] },
+    { label: 'Subscriptions', path: '/subscriptions', icon: Repeat, roles: ['ADMIN', 'FINANCE'] },
+    { label: 'Invoices & Payments', path: '/invoices', icon: Receipt, roles: ['ADMIN', 'FINANCE'] },
     { label: 'Deal Health & Risk', path: '/deal-health', icon: HeartPulse, roles: ['ADMIN', 'SALES_MANAGER', 'FINANCE'] },
     { label: 'Executive Reports', path: '/reporting', icon: BarChart3, roles: ['ADMIN', 'SALES_MANAGER', 'FINANCE'] },
-    { label: 'Products & Pricing', path: '/admin/products', icon: Settings, roles: ['ADMIN'] },
-    { label: 'Discount Rules', path: '/admin/discount-rules', icon: Sliders, roles: ['ADMIN'] }
+    { label: 'Admin Console', path: '/admin', icon: Settings, roles: ['ADMIN'] },
+    { label: 'Products & Pricing', path: '/admin/products', icon: Package, roles: ['ADMIN'] },
+    { label: 'Discount Rules', path: '/admin/discount-rules', icon: Sliders, roles: ['ADMIN'] },
+    { label: 'Governance Audit Log', path: '/admin/audit-log', icon: ShieldCheck, roles: ['ADMIN'] }
   ];
 
   const allowedNav = navItems.filter(item => item.roles.includes(role));

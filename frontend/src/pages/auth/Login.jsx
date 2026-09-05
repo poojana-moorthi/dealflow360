@@ -88,6 +88,8 @@ export function Login() {
       const user = await login(identifier.trim(), password);
       if (user.role === 'CUSTOMER') {
         navigate('/portal/dashboard');
+      } else if (user.role === 'FINANCE') {
+        navigate('/finance');
       } else {
         navigate('/dashboard');
       }

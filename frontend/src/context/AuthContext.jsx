@@ -31,6 +31,16 @@ export function AuthProvider({ children }) {
     return DEFAULT_DEMO_USER;
   });
 
+  const [primaryRole, setPrimaryRole] = useState(() => {
+    const savedPrimary = localStorage.getItem('dealflow360_primary_role');
+    if (savedPrimary) return savedPrimary;
+    const saved = localStorage.getItem('dealflow360_user');
+    if (saved) {
+      try { return JSON.parse(saved).role; } catch (e) {}
+    }
+    return 'SALES_REP';
+  });
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -41,6 +51,10 @@ export function AuthProvider({ children }) {
           if (res && res.success && res.data && res.data.user) {
             setUser(res.data.user);
             localStorage.setItem('dealflow360_user', JSON.stringify(res.data.user));
+            if (!localStorage.getItem('dealflow360_primary_role')) {
+              setPrimaryRole(res.data.user.role);
+              localStorage.setItem('dealflow360_primary_role', res.data.user.role);
+            }
           }
         } catch (err) {
           console.warn('[AUTH] Live session check note:', err?.message);
@@ -56,8 +70,10 @@ export function AuthProvider({ children }) {
       if (res && res.success && res.data) {
         localStorage.setItem('dealflow360_token', res.data.token);
         localStorage.setItem('dealflow360_user', JSON.stringify(res.data.user));
+        localStorage.setItem('dealflow360_primary_role', res.data.user.role);
         setToken(res.data.token);
         setUser(res.data.user);
+        setPrimaryRole(res.data.user.role);
         return res.data.user;
       }
     } catch (err) {
@@ -71,22 +87,63 @@ export function AuthProvider({ children }) {
       if (demoUsers[email]) {
         const fallback = demoUsers[email];
         setUser(fallback);
+        setPrimaryRole(fallback.role);
         localStorage.setItem('dealflow360_user', JSON.stringify(fallback));
+        localStorage.setItem('dealflow360_primary_role', fallback.role);
         return fallback;
       }
       throw err;
     }
   };
 
+  const switchRole = (newRole) => {
+    // Only administrators are permitted to switch between roles
+    if (primaryRole !== 'ADMIN' && user?.role !== 'ADMIN') {
+      console.warn('[AUTH] Access Denied: Only Admin can switch roles.');
+      return false;
+    }
+
+    const demoMap = {
+      ADMIN: { id: 1, name: 'System Admin', email: 'admin@dealflow360.com', role: 'ADMIN' },
+      SALES_REP: { id: 2, name: 'Sales Rep', email: 'sales_rep@dealflow360.com', role: 'SALES_REP' },
+      SALES_MANAGER: { id: 3, name: 'Sales Manager', email: 'sales_manager@dealflow360.com', role: 'SALES_MANAGER' },
+      FINANCE: { id: 4, name: 'Finance Lead', email: 'finance@dealflow360.com', role: 'FINANCE' }
+    };
+
+    const target = demoMap[newRole];
+    if (target) {
+      setUser(target);
+      localStorage.setItem('dealflow360_user', JSON.stringify(target));
+      return true;
+    }
+    return false;
+  };
+
   const logout = () => {
     localStorage.removeItem('dealflow360_token');
     localStorage.removeItem('dealflow360_user');
+    localStorage.removeItem('dealflow360_primary_role');
     setToken(null);
     setUser(null);
+    setPrimaryRole('SALES_REP');
   };
 
+  const isSuperAdmin = primaryRole === 'ADMIN' || user?.role === 'ADMIN';
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, setUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        logout,
+        setUser,
+        primaryRole,
+        isSuperAdmin,
+        switchRole
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

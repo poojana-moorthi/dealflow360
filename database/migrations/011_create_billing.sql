@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS billing_schedules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  subscription_id INT NOT NULL,
+  quotation_id INT NOT NULL,
+  schedule_date DATE NOT NULL,
+  due_date DATE NOT NULL,
+  amount DECIMAL(14, 2) NOT NULL,
+  status ENUM('SCHEDULED', 'INVOICED', 'PAID', 'OVERDUE') NOT NULL DEFAULT 'SCHEDULED',
+  invoice_id INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
