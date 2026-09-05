@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  subscription_number VARCHAR(100) NOT NULL UNIQUE,
+  customer_id INT NOT NULL,
+  quotation_id INT NOT NULL,
+  product_id INT NOT NULL,
+  plan_name VARCHAR(150) NOT NULL,
+  frequency ENUM('MONTHLY', 'QUARTERLY', 'YEARLY') NOT NULL,
+  unit_price DECIMAL(14, 2) NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  subtotal DECIMAL(14, 2) NOT NULL,
+  start_date DATE NOT NULL,
+  next_billing_date DATE NOT NULL,
+  end_date DATE NULL,
+  status ENUM('ACTIVE', 'PAUSED', 'CANCELLED') NOT NULL DEFAULT 'ACTIVE',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id),
+  FOREIGN KEY (quotation_id) REFERENCES quotations(id),
+  FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
