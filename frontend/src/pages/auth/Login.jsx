@@ -22,14 +22,14 @@ export function Login() {
   // View mode: 'LOGIN' | 'FORGOT'
   const [viewMode, setViewMode] = useState('LOGIN');
 
-  // Internal User Selection via Dropdown (Only Sales Manager, Sales Rep, Finance)
+  // Internal User Selection via Dropdown (Sales Rep, Sales Manager, Finance)
   const internalRoles = [
-    { label: 'Sales Manager', id: 'sales_manager', defaultEmail: 'sales_rep@dealflow360.com' },
-    { label: 'Sales Representative', id: 'sales_rep', defaultEmail: 'sales_manager@dealflow360.com' },
+    { label: 'Sales Representative', id: 'sales_rep', defaultEmail: 'sales_rep@dealflow360.com' },
+    { label: 'Sales Manager', id: 'sales_manager', defaultEmail: 'sales_manager@dealflow360.com' },
     { label: 'Finance', id: 'finance', defaultEmail: 'finance@dealflow360.com' }
   ];
 
-  const [selectedRole, setSelectedRole] = useState('sales_manager');
+  const [selectedRole, setSelectedRole] = useState('sales_rep');
 
   // Login Form States - strictly empty by default with placeholders until user manually types
   const [identifier, setIdentifier] = useState('');
@@ -91,6 +91,8 @@ export function Login() {
         navigate('/portal/dashboard');
       } else if (user.role === 'FINANCE') {
         navigate('/finance');
+      } else if (user.role === 'SALES_REP' || user.role === 'ADMIN') {
+        navigate('/quotations');
       } else {
         navigate('/dashboard');
       }

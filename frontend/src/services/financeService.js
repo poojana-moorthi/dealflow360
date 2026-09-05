@@ -140,10 +140,50 @@ export const INITIAL_INVOICES = [
   }
 ];
 
+export const INITIAL_CREDIT_NOTES = [
+  {
+    id: 1,
+    credit_note_number: 'CN-2026-001',
+    invoice_number: 'INV-1042',
+    customer_name: 'Acme Corp',
+    amount: 450,
+    issue_date: '2026-09-02',
+    reason: 'Deployment SLA Service Credit Adjustment',
+    status: 'RECONCILED',
+    reconciled_at: '2026-09-03',
+    reconciled_by: 'David Miller (Finance)'
+  },
+  {
+    id: 2,
+    credit_note_number: 'CN-2026-002',
+    invoice_number: 'INV-1045',
+    customer_name: 'Zenith Health Systems',
+    amount: 2500,
+    issue_date: '2026-09-04',
+    reason: 'Hardware Shipment Batch Lead-Time Concession',
+    status: 'PENDING',
+    reconciled_at: null,
+    reconciled_by: null
+  },
+  {
+    id: 3,
+    credit_note_number: 'CN-2026-003',
+    invoice_number: 'INV-1047',
+    customer_name: 'TechCorp International',
+    amount: 1800,
+    issue_date: '2026-09-05',
+    reason: 'Quarterly Volume Rebate Credit',
+    status: 'PENDING',
+    reconciled_at: null,
+    reconciled_by: null
+  }
+];
+
 class FinanceService {
   constructor() {
     this.subscriptions = [...INITIAL_SUBSCRIPTIONS];
     this.invoices = [...INITIAL_INVOICES];
+    this.creditNotes = [...INITIAL_CREDIT_NOTES];
   }
 
   getOverview() {
@@ -308,6 +348,47 @@ class FinanceService {
       effectiveDate: 'Immediately (Today)',
       nextCycleRenewal: 'Standard Cycle Reset'
     };
+  }
+
+  getCreditNotes() {
+    return this.creditNotes;
+  }
+
+  issueCreditNote({ invoice_number, customer_name, amount, reason }) {
+    const newNote = {
+      id: this.creditNotes.length + 1,
+      credit_note_number: `CN-2026-00${this.creditNotes.length + 1}`,
+      invoice_number: invoice_number || 'INV-1042',
+      customer_name: customer_name || 'Acme Corp',
+      amount: parseFloat(amount) || 0,
+      issue_date: new Date().toISOString().slice(0, 10),
+      reason: reason || 'Commercial Credit Adjustment',
+      status: 'PENDING',
+      reconciled_at: null,
+      reconciled_by: null
+    };
+    this.creditNotes.unshift(newNote);
+    return newNote;
+  }
+
+  reconcileCreditNote(creditNoteId) {
+    const note = this.creditNotes.find(c => c.id === parseInt(creditNoteId, 10));
+    if (!note) return null;
+    note.status = 'RECONCILED';
+    note.reconciled_at = new Date().toISOString().slice(0, 10);
+    note.reconciled_by = salesMockService.currentPersona?.name || 'David Miller (Finance)';
+    
+    // Also adjust invoice balance
+    const inv = this.invoices.find(i => i.invoice_number === note.invoice_number);
+    if (inv) {
+      inv.paid_amount = Math.min(inv.total_amount, (inv.paid_amount || 0) + note.amount);
+      if (inv.paid_amount >= inv.total_amount) {
+        inv.status = 'PAID';
+      } else if (inv.paid_amount > 0) {
+        inv.status = 'PARTIALLY_PAID';
+      }
+    }
+    return note;
   }
 }
 

@@ -136,4 +136,47 @@ async function calculateRiskScore({ customerTier, items, grossMarginPct, totalAm
   };
 }
 
-module.exports = { calculateRiskScore };
+/**
+ * Deterministic Governance Evaluation Function
+ * One Governance Engine powering Quotation Builder, Approval Queue, Admin Simulator, and Deal Health.
+ */
+function evaluateGovernance({ customerTier = 'Gold', category = 'Hardware', discount = 0, grossMargin = 30, dealValue = 0 }) {
+  const tierLimits = { Bronze: 5, Silver: 10, Gold: 15, Enterprise: 20, Platinum: 20 };
+  const categoryLimits = { Hardware: 15, Services: 10, Cloud: 12, Software: 15, Subscription: 10, Accessories: 20 };
+
+  const tierCeiling = tierLimits[customerTier] ?? 15;
+  const catCeiling = categoryLimits[category] ?? 15;
+  const discountCeiling = Math.min(tierCeiling, catCeiling);
+
+  const discountAllowed = discount <= discountCeiling;
+  const marginFloor = 30;
+
+  let riskScore = 15;
+  if (!discountAllowed) riskScore += Math.round((discount - discountCeiling) * 4);
+  if (grossMargin < 25) riskScore += 30;
+  else if (grossMargin < 30) riskScore += 15;
+  if (dealValue > 50000) riskScore += 10;
+  riskScore = Math.min(99, Math.max(10, riskScore));
+
+  const riskLevel = riskScore >= 70 ? 'HIGH' : riskScore >= 40 ? 'MEDIUM' : 'LOW';
+  const approvalRoute = [];
+  if (!discountAllowed || riskScore >= 40) approvalRoute.push('SALES_MANAGER');
+  if (grossMargin < 25 || riskScore >= 70 || discount > discountCeiling + 10) approvalRoute.push('FINANCE');
+
+  const decision = approvalRoute.length > 0 ? 'REQUIRES_APPROVAL' : 'AUTO_APPROVED';
+
+  return {
+    discountAllowed,
+    discountCeiling,
+    requestedDiscount: discount,
+    grossMargin,
+    marginFloor,
+    riskScore,
+    riskLevel,
+    decision,
+    approvalRoute
+  };
+}
+
+module.exports = { calculateRiskScore, evaluateGovernance };
+

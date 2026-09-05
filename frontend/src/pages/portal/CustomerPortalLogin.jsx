@@ -12,11 +12,6 @@ export function CustomerPortalLogin() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleFillDemo = () => {
-    setEmail('customer1@dealflow360.com');
-    setPassword('Password123!');
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -114,17 +109,6 @@ export function CustomerPortalLogin() {
             >
               {loading ? 'Authenticating...' : 'Log In to Customer Portal'}
             </button>
-
-            {/* Quick Demo Credential Filler */}
-            <div className="pt-2 text-center">
-              <button
-                type="button"
-                onClick={handleFillDemo}
-                className="text-[11px] font-medium text-slate-500 hover:text-blue-600 underline"
-              >
-                Use Demo Customer: customer1@dealflow360.com / Password123!
-              </button>
-            </div>
           </form>
 
           <div className="mt-6 pt-4 border-t border-slate-200 text-center">

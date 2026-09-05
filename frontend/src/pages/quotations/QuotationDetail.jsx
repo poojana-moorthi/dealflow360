@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useSales } from '../../context/SalesContext';
-import { formatCurrency, formatPercent } from '../../utils/formatters';
-import { Toast } from '../../components/common/Card';
+import { useAuth } from '../../context/AuthContext';
+import { formatCurrency, formatPercent, formatDate } from '../../utils/formatters';
+import { Toast, Modal } from '../../components/common/Card';
 import {
   ArrowLeft,
+  ArrowRight,
   Building2,
   Package,
   Calculator,
@@ -19,13 +21,19 @@ import {
   Send,
   XCircle,
   ThumbsUp,
-  History
+  History,
+  MessageSquare,
+  Mail
 } from 'lucide-react';
+import { getCustomerEmail, getQuotationCustody } from '../../utils/quotationCustody';
+import portalService from '../../services/portalService';
 
 export function QuotationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getQuotationById, updateQuotation, resolveApproval, approvals, auditEvents, persona } = useSales();
+  const { user } = useAuth();
+  const currentRole = user?.role || persona?.role || 'SALES_REP';
 
   const [toastMessage, setToastMessage] = useState('');
 
@@ -74,6 +82,14 @@ export function QuotationDetail() {
     return approvals.find(a => a.quotation_id === quote.id && a.status === 'PENDING');
   }, [approvals, quote.id]);
 
+  const customerEmail = useMemo(() => {
+    return getCustomerEmail(quote.customer_id, quote.customer_name);
+  }, [quote.customer_id, quote.customer_name]);
+
+  const custody = useMemo(() => {
+    return getQuotationCustody(quote);
+  }, [quote]);
+
   // Apply AI Recommendation handler
   const handleApplyRecommendation = (rec) => {
     const updatedItems = (quote.items || []).map(it => {
@@ -108,7 +124,7 @@ export function QuotationDetail() {
   // Approval actions (by Manager or Finance)
   const handleApprove = () => {
     if (matchingApproval) {
-      resolveApproval(matchingApproval.id, 'APPROVE', `Commercial approval granted by ${persona.role}`);
+      resolveApproval(matchingApproval.id, 'APPROVE', `Commercial approval granted by ${currentRole}`);
     } else {
       updateQuotation(quote.id, { status: 'APPROVED', stage: 'APPROVED', approval_required: false });
     }
@@ -117,15 +133,79 @@ export function QuotationDetail() {
 
   const handleReject = () => {
     if (matchingApproval) {
-      resolveApproval(matchingApproval.id, 'REJECT', `Commercial exception rejected by ${persona.role}`);
+      resolveApproval(matchingApproval.id, 'REJECT', `Commercial exception rejected by ${currentRole}`);
     } else {
       updateQuotation(quote.id, { status: 'REJECTED', stage: 'REJECTED' });
     }
     setToastMessage('Quotation returned / rejected.');
   };
 
-  const isSalesRepresentative = persona.role === 'SALES_REP';
-  const canApprove = (persona.role === 'SALES_MANAGER' || persona.role === 'FINANCE' || persona.role === 'ADMIN') && quote.status === 'PENDING APPROVAL';
+  // Customer Negotiation Responses
+  const [repReplyText, setRepReplyText] = useState('');
+  const [showCounterModal, setShowCounterModal] = useState(false);
+  const [revisedDiscount, setRevisedDiscount] = useState(quote.discount_pct || 15);
+  const [revisedComment, setRevisedComment] = useState('');
+
+  const negotiations = quote.negotiations || [
+    {
+      id: 1,
+      sender: 'CUSTOMER',
+      sender_name: quote.customer_name || 'Acme Procurement',
+      time: '2 hours ago',
+      counter_price: Math.round(quote.total_amount * 0.92),
+      discount_pct: Math.min(50, Math.round((quote.discount_pct || 15) + 3)),
+      comment: 'We are requesting a volume revision or concession on hardware lines to fit our Q3 budget envelope.'
+    }
+  ];
+
+  const handleAcceptCounterOffer = (counter) => {
+    updateQuotation(quote.id, {
+      total_amount: counter.counter_price,
+      discount_pct: counter.discount_pct,
+      status: 'APPROVED',
+      stage: 'APPROVED',
+      notes: `Customer counter-offer accepted by ${user?.name || 'Sales Rep'}`
+    });
+    setToastMessage(`Customer counter-offer accepted! Quote revised to ${formatCurrency(counter.counter_price)} and approved.`);
+  };
+
+  const handleSendRepReply = (e) => {
+    e.preventDefault();
+    if (!repReplyText.trim()) return;
+    const repMessage = repReplyText.trim();
+    updateQuotation(quote.id, {
+      notes: `Sales Rep response: ${repMessage}`
+    });
+    portalService.recordSalesRepMessage(quote.id, {
+      comment: repMessage,
+      userName: user?.name || 'Alex Morgan (Sales Rep)'
+    });
+    setToastMessage(`Response delivered to customer portal: "${repMessage}"`);
+    setRepReplyText('');
+  };
+
+  const handleRevisedCounterSubmit = (e) => {
+    e.preventDefault();
+    const newPrice = Math.round((quote.subtotal || quote.total_amount) * (1 - revisedDiscount / 100));
+    const noteText = revisedComment.trim() || `Sales Rep offered revised pricing of ${formatCurrency(newPrice)} (${revisedDiscount}% discount).`;
+    updateQuotation(quote.id, {
+      total_amount: newPrice,
+      discount_pct: parseFloat(revisedDiscount),
+      stage: 'NEGOTIATION',
+      notes: `Counter-proposal sent: ${noteText}`
+    });
+    portalService.recordSalesRepMessage(quote.id, {
+      comment: noteText,
+      counterPrice: newPrice,
+      counterDiscountPct: parseFloat(revisedDiscount),
+      userName: user?.name || 'Alex Morgan (Sales Rep)'
+    });
+    setShowCounterModal(false);
+    setToastMessage(`Revised counter-offer of ${formatCurrency(newPrice)} (${revisedDiscount}%) submitted to customer portal.`);
+  };
+
+  const isSalesRepresentative = currentRole === 'SALES_REP';
+  const canApprove = (currentRole === 'SALES_MANAGER' || currentRole === 'FINANCE' || currentRole === 'ADMIN') && quote.status === 'PENDING APPROVAL';
 
   return (
     <div className="space-y-6">
@@ -154,7 +234,7 @@ export function QuotationDetail() {
         </div>
       </div>
 
-      {/* 16. Header matching specification */}
+      {/* Header matching specification */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
@@ -164,9 +244,15 @@ export function QuotationDetail() {
             <span className="text-xl font-bold text-slate-400">•</span>
             <span className="text-xl font-bold text-slate-800">{quote.customer_name}</span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Created on {new Date(quote.created_at || Date.now()).toLocaleDateString()} • Tier: {quote.customer_tier}
-          </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+            <span>Created on {new Date(quote.created_at || Date.now()).toLocaleDateString()} • Tier: {quote.customer_tier}</span>
+            <span className="text-slate-300">•</span>
+            <span className="flex items-center gap-1 font-semibold text-slate-700">
+              <Mail className="w-3.5 h-3.5 text-blue-600" />
+              <span>Customer Email:</span>
+              <strong className="font-mono text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">{customerEmail}</strong>
+            </span>
+          </div>
         </div>
 
         {/* Pricing Total in Header */}
@@ -179,6 +265,36 @@ export function QuotationDetail() {
               ? `Pending ${quote.required_approval_level || 'Finance'} Approval`
               : quote.status}
           </span>
+        </div>
+      </div>
+
+      {/* Prominent Quotation Approval Status & Hands Tracking Banner */}
+      <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs ${custody.badgeClass}`}>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-black uppercase tracking-wider">
+              Quotation Approval Status: {quote.status}
+            </span>
+            <span className="text-xs font-bold px-2 py-0.5 rounded bg-white shadow-2xs">
+              {custody.label}
+            </span>
+          </div>
+          <div className="text-xs font-semibold">
+            <span>Approval / Review Authority: </span>
+            <strong className="underline">{custody.reviewer}</strong>
+          </div>
+          <p className="text-[11px] opacity-90 leading-relaxed">
+            {custody.description}
+          </p>
+        </div>
+
+        <div className="text-left sm:text-right shrink-0 bg-white/70 sm:bg-transparent p-2.5 sm:p-0 rounded-lg border sm:border-0 border-current/20">
+          <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+            In Whose Hands It Is
+          </div>
+          <div className="text-sm font-black mt-0.5">
+            {custody.hands}
+          </div>
         </div>
       </div>
 
@@ -237,6 +353,13 @@ export function QuotationDetail() {
             <div>
               <span className="text-slate-500 block text-[11px]">Account Name:</span>
               <span className="font-bold text-slate-900">{quote.customer_name}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[11px]">Customer Email ID:</span>
+              <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded inline-flex items-center gap-1 text-xs mt-0.5 border border-blue-100">
+                <Mail className="w-3 h-3 text-blue-600" />
+                {customerEmail}
+              </span>
             </div>
             <div>
               <span className="text-slate-500 block text-[11px]">Customer Tier:</span>
@@ -319,6 +442,87 @@ export function QuotationDetail() {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Customer Negotiation & Counter-Offer Response Console (Sales Rep <-> Customer) */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs space-y-3 p-5">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-amber-600" />
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Customer Negotiation Requests & Counter-Offers
+            </h3>
+          </div>
+          <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+            Active Negotiation Thread
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          {negotiations.map((neg, idx) => (
+            <div key={idx} className="bg-amber-50/50 border border-amber-200 rounded-lg p-3.5 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <div className="flex items-center gap-2 font-bold text-slate-900">
+                  <span>{neg.sender_name}</span>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-semibold">Customer Counter-Offer</span>
+                </div>
+                <span className="text-slate-400 text-[11px]">{neg.time}</span>
+              </div>
+
+              <div className="text-xs text-slate-700 font-medium italic bg-white p-2.5 rounded border border-amber-100">
+                "{neg.comment}"
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-600">Customer Proposed Price: <strong className="text-emerald-700 text-sm font-mono">{formatCurrency(neg.counter_price)}</strong></span>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-slate-600">Requested Discount: <strong className="text-rose-600 font-mono">{neg.discount_pct}%</strong></span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAcceptCounterOffer(neg)}
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-xs transition shadow-2xs cursor-pointer flex items-center gap-1"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Accept Customer Counter-Offer</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRevisedDiscount(quote.discount_pct || 15);
+                      setRevisedComment('');
+                      setShowCounterModal(true);
+                    }}
+                    className="px-3 py-1 bg-[#1565C0] hover:bg-blue-700 text-white font-bold rounded text-xs transition shadow-2xs cursor-pointer"
+                  >
+                    Propose Revised Terms
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Quick Reply Form to Customer Portal */}
+          <form onSubmit={handleSendRepReply} className="flex gap-2 pt-2">
+            <input
+              type="text"
+              placeholder={`Type response or concessions to send directly to ${customerEmail}...`}
+              value={repReplyText}
+              onChange={(e) => setRepReplyText(e.target.value)}
+              className="flex-1 px-3 py-2 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Reply to Customer</span>
+            </button>
+          </form>
         </div>
       </div>
 
@@ -463,6 +667,63 @@ export function QuotationDetail() {
           </div>
         </div>
       </div>
+
+
+      {/* Revised Counter Proposal Modal */}
+      {showCounterModal && (
+        <Modal
+          isOpen={showCounterModal}
+          title={`Propose Revised Terms for ${quote.quotation_number}`}
+          onClose={() => setShowCounterModal(false)}
+        >
+          <form onSubmit={handleRevisedCounterSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Adjusted Discount (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="50"
+                step="0.5"
+                required
+                value={revisedDiscount}
+                onChange={(e) => setRevisedDiscount(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded text-sm font-bold text-slate-800"
+              />
+              <span className="text-[11px] text-slate-500 mt-1 block">
+                Calculated Price: {formatCurrency(Math.round((quote.subtotal || quote.total_amount) * (1 - revisedDiscount / 100)))}
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Explanation Note for Customer</label>
+              <textarea
+                rows={3}
+                required
+                placeholder="We can meet you at 18% discount if commitment is signed before end of quarter..."
+                value={revisedComment}
+                onChange={(e) => setRevisedComment(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded text-xs"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowCounterModal(false)}
+                className="px-3 py-1.5 border border-slate-300 text-slate-600 rounded text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 bg-[#1565C0] hover:bg-blue-700 text-white rounded text-xs font-bold transition shadow-2xs cursor-pointer"
+              >
+                Submit Revised Counter
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

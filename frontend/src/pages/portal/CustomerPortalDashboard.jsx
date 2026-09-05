@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import portalService from '../../services/portalService';
 import { PortalHeader } from '../../components/portal/PortalHeader';
 import { NegotiationChat, CounterOfferForm } from '../../components/portal/NegotiationChat';
-import { Loader, Toast } from '../../components/common/Card';
+import { Loader, Toast, Modal } from '../../components/common/Card';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { FileText, CheckCircle2, MessageSquare, AlertTriangle, ArrowRight, ShieldCheck, HelpCircle } from 'lucide-react';
+import { getQuotationCustody } from '../../utils/quotationCustody';
+import { FileText, CheckCircle2, MessageSquare, AlertTriangle, ArrowRight, ShieldCheck, HelpCircle, Send, Clock, UserCheck, Sparkles } from 'lucide-react';
 
 export function CustomerPortalDashboard() {
   const navigate = useNavigate();
@@ -17,10 +18,30 @@ export function CustomerPortalDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
+  // Line-Level Question & Inquiry State
+  const [lineQuestionItem, setLineQuestionItem] = useState(null);
+  const [lineQuestionText, setLineQuestionText] = useState('');
+  const [lineCounterDiscount, setLineCounterDiscount] = useState('');
+
   const userJson = localStorage.getItem('dealflow360_portal_user');
   const authUserJson = localStorage.getItem('dealflow360_user');
   const stored = userJson ? JSON.parse(userJson) : (authUserJson ? JSON.parse(authUserJson) : null);
   const portalUser = stored || { name: 'Customer Partner', email: 'customer1@dealflow360.com', companyName: 'Acme Corporation' };
+
+  // Resolve customer company name (never mail id)
+  const companyName = useMemo(() => {
+    return (
+      portalUser.companyName ||
+      portalUser.company_name ||
+      quoteDetail?.customer_name ||
+      quotes[0]?.customer_name ||
+      (portalUser.email?.toLowerCase().includes('nova') ? 'Nova Technologies' :
+       portalUser.email?.toLowerCase().includes('techcorp') ? 'TechCorp International' :
+       portalUser.email?.toLowerCase().includes('delta') ? 'Delta Logistics LLC' :
+       portalUser.email?.toLowerCase().includes('zenith') ? 'Zenith Health Systems' :
+       'Acme Corporation')
+    );
+  }, [portalUser, quoteDetail, quotes]);
 
   const loadQuotes = async () => {
     try {
@@ -62,6 +83,39 @@ export function CustomerPortalDashboard() {
     }
   }, [selectedQuoteId]);
 
+  // Real-time synchronization when sales rep replies or proposes revised terms
+  useEffect(() => {
+    const handlePortalUpdate = () => {
+      loadQuotes();
+      if (selectedQuoteId) {
+        loadQuoteDetail(selectedQuoteId);
+      }
+    };
+    window.addEventListener('dealflow360_portal_update', handlePortalUpdate);
+    window.addEventListener('storage', handlePortalUpdate);
+
+    // Fast polling to pick up any replies or revisions
+    const pollInterval = setInterval(() => {
+      if (selectedQuoteId) {
+        loadQuoteDetail(selectedQuoteId);
+      }
+    }, 3000);
+
+    return () => {
+      window.removeEventListener('dealflow360_portal_update', handlePortalUpdate);
+      window.removeEventListener('storage', handlePortalUpdate);
+      clearInterval(pollInterval);
+    };
+  }, [selectedQuoteId]);
+
+  // Detect latest revised proposal from sales rep
+  const latestRepRevision = useMemo(() => {
+    if (!quoteDetail || !quoteDetail.negotiations) return null;
+    return quoteDetail.negotiations.find(
+      (n) => n.role === 'SALES_REP' && n.counter_price && n.id !== 'init-1'
+    );
+  }, [quoteDetail]);
+
   const handleCounterOfferSubmit = async ({ counterPrice, counterDiscountPct, comment }) => {
     setSubmitting(true);
     try {
@@ -94,6 +148,30 @@ export function CustomerPortalDashboard() {
     }
   };
 
+  const handleLineQuestionSubmit = async (e) => {
+    e.preventDefault();
+    if (!lineQuestionItem) return;
+    setSubmitting(true);
+    try {
+      const discountPart = lineCounterDiscount ? ` (Requested Line Discount: ${lineCounterDiscount}%)` : '';
+      const message = `[Item Inquiry: ${lineQuestionItem.product_name}]${discountPart}: ${lineQuestionText}`;
+      await portalService.submitNegotiation(selectedQuoteId, {
+        counterPrice: quoteDetail.total_amount,
+        counterDiscountPct: quoteDetail.discount_pct || 0,
+        comment: message
+      });
+      setToastMessage(`Question on "${lineQuestionItem.product_name}" submitted to Account Executive.`);
+      setLineQuestionItem(null);
+      setLineQuestionText('');
+      setLineCounterDiscount('');
+      await loadQuoteDetail(selectedQuoteId);
+    } catch (err) {
+      setToastMessage(err.message || 'Failed to submit line-level inquiry.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) return <Loader text="Connecting to Secure Customer Procurement Space..." />;
 
   return (
@@ -102,8 +180,8 @@ export function CustomerPortalDashboard() {
 
       {/* Header */}
       <PortalHeader
-        customerName={portalUser.name || 'Johnathan Acme'}
-        companyName={portalUser.companyName || 'Acme Corporation'}
+        companyName={companyName}
+        customerName={companyName}
       />
 
       {/* Two Column Grid */}
@@ -125,39 +203,44 @@ export function CustomerPortalDashboard() {
                 <p className="mt-1 text-slate-400">Your Account Executive has not yet published an active quote.</p>
               </div>
             ) : (
-              quotes.map((q) => (
-                <div
-                  key={q.id}
-                  onClick={() => setSelectedQuoteId(q.id)}
-                  className={`p-4 rounded-lg border cursor-pointer transition ${
-                    selectedQuoteId === q.id
-                      ? 'border-[#1565C0] bg-blue-50/50 shadow-xs ring-1 ring-blue-500/20'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-blue-700">{q.quotation_number}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        q.status === 'CONFIRMED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : q.status === 'NEGOTIATION'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {q.status}
-                    </span>
+              quotes.map((q) => {
+                const custody = getQuotationCustody(q);
+                return (
+                  <div
+                    key={q.id}
+                    onClick={() => setSelectedQuoteId(q.id)}
+                    className={`p-4 rounded-lg border cursor-pointer transition ${
+                      selectedQuoteId === q.id
+                        ? 'border-[#1565C0] bg-blue-50/50 shadow-xs ring-1 ring-blue-500/20'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-blue-700">{q.quotation_number}</span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border ${custody.badgeClass}`}
+                      >
+                        {q.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 text-base font-extrabold text-slate-900 font-mono">
+                      {formatCurrency(q.total_amount)}
+                    </div>
+
+                    {/* Custody Tag */}
+                    <div className="mt-2 text-[10px] font-bold py-0.5 px-1.5 rounded bg-slate-100 text-slate-700 flex items-center gap-1 border border-slate-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>
+                      <span className="truncate">{custody.label}</span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 mt-1.5 flex justify-between pt-1 border-t border-slate-100">
+                      <span>AE: {q.sales_rep_name || 'Alex Morgan'}</span>
+                      <span>Valid: {formatDate(q.valid_until)}</span>
+                    </div>
                   </div>
-                  <div className="mt-2 text-base font-extrabold text-slate-900">
-                    {formatCurrency(q.total_amount)}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1.5 flex justify-between pt-1 border-t border-slate-100">
-                    <span>AE: {q.sales_rep_name || 'Alex Morgan'}</span>
-                    <span>Valid: {formatDate(q.valid_until)}</span>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -182,13 +265,7 @@ export function CustomerPortalDashboard() {
                   <div className="flex items-center gap-2 mb-1">
                     <h2 className="text-lg font-bold text-slate-900">{quoteDetail.quotation_number}</h2>
                     <span
-                      className={`px-2.5 py-0.5 rounded text-xs font-bold ${
-                        quoteDetail.status === 'CONFIRMED'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : quoteDetail.status === 'NEGOTIATION'
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-blue-100 text-blue-800 border border-blue-200'
-                      }`}
+                      className={`px-2.5 py-0.5 rounded text-xs font-bold border ${getQuotationCustody(quoteDetail).badgeClass}`}
                     >
                       {quoteDetail.status}
                     </span>
@@ -219,6 +296,73 @@ export function CustomerPortalDashboard() {
                 )}
               </div>
 
+              {/* Highlighted Sales Rep Revised Counter-Offer Alert */}
+              {latestRepRevision && quoteDetail.status !== 'CONFIRMED' && (
+                <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-xl shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-2xs flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        <span>Revised Terms Offered by Sales Rep</span>
+                      </span>
+                      <span className="text-xs font-bold text-emerald-950">
+                        Revised Price: {formatCurrency(latestRepRevision.counter_price)} {latestRepRevision.counter_discount_pct ? `(${latestRepRevision.counter_discount_pct}% Discount)` : ''}
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-900 font-medium italic">
+                      "{latestRepRevision.comment}"
+                    </p>
+                    <div className="text-[11px] text-emerald-700">
+                      Proposed by {latestRepRevision.user_name} • Ready for your immediate acceptance
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleConfirmOrder}
+                    disabled={submitting}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md transition shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Accept Revised Terms</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Prominent Quotation Approval Status & In Whose Hands It Is Banner */}
+              {(() => {
+                const c = getQuotationCustody(quoteDetail);
+                return (
+                  <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs ${c.badgeClass}`}>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-black uppercase tracking-wider">
+                          Proposal Status: {quoteDetail.status}
+                        </span>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-white shadow-2xs">
+                          {c.label}
+                        </span>
+                      </div>
+                      <div className="text-xs font-semibold">
+                        <span>Current Custody Hand: </span>
+                        <strong className="underline">{c.reviewer}</strong>
+                      </div>
+                      <p className="text-[11px] opacity-90 leading-relaxed">
+                        {c.description}
+                      </p>
+                    </div>
+
+                    <div className="text-left sm:text-right shrink-0 bg-white/80 p-2.5 rounded-lg border border-current/20">
+                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+                        In Whose Hands It Is
+                      </div>
+                      <div className="text-sm font-black text-slate-900 mt-0.5">
+                        {c.hands}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Items Breakdown Table */}
               <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
@@ -235,6 +379,7 @@ export function CustomerPortalDashboard() {
                         <th className="py-2.5 px-3">Unit Price</th>
                         <th className="py-2.5 px-3">Discount</th>
                         <th className="py-2.5 px-3 text-right">Net Line Price</th>
+                        <th className="py-2.5 px-3 text-center">Line Inquiry</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -255,6 +400,21 @@ export function CustomerPortalDashboard() {
                           <td className="py-2.5 px-3">{formatCurrency(it.unit_price)}</td>
                           <td className="py-2.5 px-3 text-amber-700 font-semibold">{it.discount_pct}%</td>
                           <td className="py-2.5 px-3 font-bold text-slate-900 text-right">{formatCurrency(it.line_total)}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLineQuestionItem(it);
+                                setLineQuestionText('');
+                                setLineCounterDiscount(it.discount_pct || '');
+                              }}
+                              className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-[#1565C0] border border-blue-200 rounded text-[11px] font-semibold flex items-center gap-1 mx-auto transition cursor-pointer"
+                              title="Ask question or propose counter discount on this line"
+                            >
+                              <MessageSquare className="w-3 h-3" />
+                              <span>Ask</span>
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -294,6 +454,76 @@ export function CustomerPortalDashboard() {
           )}
         </div>
       </div>
+
+      {/* Line Level Inquiry Modal */}
+      {lineQuestionItem && (
+        <Modal
+          isOpen={!!lineQuestionItem}
+          title={`Line Item Inquiry: ${lineQuestionItem.product_name}`}
+          onClose={() => setLineQuestionItem(null)}
+        >
+          <form onSubmit={handleLineQuestionSubmit} className="space-y-4 text-xs">
+            <div className="bg-slate-50 p-3 rounded border border-slate-200">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Product / Scope:</span>
+                <span className="font-bold text-slate-900">{lineQuestionItem.product_name}</span>
+              </div>
+              <div className="flex justify-between text-xs mt-1">
+                <span className="text-slate-500">Current Unit Price:</span>
+                <span className="font-bold text-slate-800">{formatCurrency(lineQuestionItem.unit_price)}</span>
+              </div>
+              <div className="flex justify-between text-xs mt-1">
+                <span className="text-slate-500">Current Discount:</span>
+                <span className="font-bold text-amber-700">{lineQuestionItem.discount_pct}%</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Proposed Line Discount Counter (%) [Optional]</label>
+              <input
+                type="number"
+                min="0"
+                max="50"
+                step="0.5"
+                placeholder={`Current is ${lineQuestionItem.discount_pct}%`}
+                value={lineCounterDiscount}
+                onChange={(e) => setLineCounterDiscount(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Your Question or Adjustment Request</label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Ask about volume pricing, delivery lead time, or service scope for this item..."
+                value={lineQuestionText}
+                onChange={(e) => setLineQuestionText(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setLineQuestionItem(null)}
+                className="px-3 py-1.5 border border-slate-300 text-slate-600 rounded text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-1.5 bg-[#1565C0] hover:bg-blue-700 text-white rounded text-xs font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+              >
+                <Send className="w-3 h-3" />
+                <span>{submitting ? 'Submitting...' : 'Submit Line Inquiry'}</span>
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

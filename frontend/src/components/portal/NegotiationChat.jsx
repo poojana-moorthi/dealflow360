@@ -18,29 +18,48 @@ export function NegotiationChat({ negotiations = [], currentQuotationTotal }) {
         ) : (
           negotiations.map((n) => {
             const isCustomer = n.role === 'CUSTOMER';
+            const isRevisedOffer = !isCustomer && n.counter_price;
             return (
               <div
                 key={n.id}
                 className={`p-3 rounded-lg text-xs border ${
                   isCustomer
-                    ? 'bg-blue-50/70 border-blue-100 ml-4'
-                    : 'bg-slate-50 border-slate-200 mr-4'
+                    ? 'bg-blue-50/70 border-blue-200 ml-4'
+                    : isRevisedOffer
+                    ? 'bg-emerald-50 border-emerald-300 mr-4 shadow-2xs'
+                    : 'bg-amber-50/60 border-amber-200 mr-4'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1 text-[11px]">
-                  <span className="font-bold text-slate-900 flex items-center gap-1">
-                    <User className="w-3 h-3 text-slate-500" />
-                    {n.user_name} ({n.role})
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-slate-900 flex items-center gap-1">
+                      <User className="w-3 h-3 text-slate-500" />
+                      {n.user_name}
+                    </span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase ${
+                      isCustomer
+                        ? 'bg-blue-100 text-blue-800'
+                        : isRevisedOffer
+                        ? 'bg-emerald-200 text-emerald-900'
+                        : 'bg-amber-100 text-amber-900'
+                    }`}>
+                      {isCustomer ? 'Customer' : isRevisedOffer ? 'Sales Counter-Offer' : 'Sales Rep Reply'}
+                    </span>
+                  </div>
                   <span className="text-slate-400 text-[10px]">{formatDateTime(n.created_at)}</span>
                 </div>
                 {n.counter_price && (
-                  <div className="my-1.5 p-1.5 bg-white rounded border border-blue-200 inline-block font-semibold text-blue-900">
-                    Counter Offer Price: {formatCurrency(n.counter_price)}
+                  <div className={`my-1.5 p-1.5 rounded border inline-block font-semibold ${
+                    isRevisedOffer
+                      ? 'bg-white border-emerald-300 text-emerald-900 font-bold'
+                      : 'bg-white border-blue-200 text-blue-900'
+                  }`}>
+                    {isRevisedOffer ? 'Sales Proposed Price: ' : 'Counter Offer Price: '}
+                    {formatCurrency(n.counter_price)}
                     {n.counter_discount_pct && ` (${n.counter_discount_pct}% discount)`}
                   </div>
                 )}
-                <p className="text-slate-700 mt-1">{n.comment}</p>
+                <p className="text-slate-800 mt-1 font-medium">{n.comment}</p>
               </div>
             );
           })

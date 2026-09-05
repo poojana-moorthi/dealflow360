@@ -101,6 +101,22 @@ export function QuotationBuilder() {
     ]);
   };
 
+  // Add Upsell Item
+  const handleAddUpsell = (productId, defaultQty = 1, defaultDiscount = 10) => {
+    const prod = products.find(p => p.id === productId) || products[0];
+    setLineItems(prev => [
+      ...prev,
+      {
+        product_id: prod.id,
+        quantity: defaultQty,
+        unit_price: prod.unit_price,
+        unit_cost: prod.unit_cost,
+        discount_pct: defaultDiscount
+      }
+    ]);
+    setToastMessage(`Upsell added: ${prod.name} (+${formatCurrency(prod.unit_price * defaultQty)})`);
+  };
+
   // Update Line Item
   const handleUpdateItem = (index, field, value) => {
     setLineItems(prev => {
@@ -458,6 +474,48 @@ export function QuotationBuilder() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Intelligent Upsell & Margin-Accretive Add-Ons */}
+      <div className="bg-gradient-to-r from-purple-50/70 to-indigo-50/70 p-4 rounded-lg border border-purple-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <h3 className="text-xs font-bold text-purple-950 uppercase tracking-wider">
+              Intelligent Upsell & High-Margin Add-Ons
+            </h3>
+          </div>
+          <span className="text-[11px] font-semibold text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded">
+            Boosts Blended Margin to 40%+
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { id: 7, name: '3-Year Premium Care SLA', category: 'Support', price: 450, margin: '68%', badge: 'High Margin Service' },
+            { id: 4, name: 'Thunderbolt Docking Station Pro', category: 'Hardware', price: 280, margin: '42%', badge: 'Popular Bundle' },
+            { id: 6, name: 'Onsite Deployment & Integration', category: 'Services', price: 450, margin: '51%', badge: 'Implementation' }
+          ].map(up => (
+            <div key={up.id} className="bg-white p-3 rounded-md border border-purple-100 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-[10px] font-bold text-purple-700 mb-1">
+                  <span>{up.badge}</span>
+                  <span className="text-emerald-700">{up.margin} Margin</span>
+                </div>
+                <div className="font-bold text-slate-900 text-xs">{up.name}</div>
+                <div className="text-slate-500 text-[11px] mt-0.5">${up.price} / unit</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleAddUpsell(up.id)}
+                className="mt-2.5 w-full py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>+ Add Upsell Item</span>
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -58,7 +58,7 @@ export function EmptyState({ title = 'No data available', description = 'There a
   );
 }
 
-export function Modal({ isOpen, onClose, title, children }) {
+export function Modal({ isOpen = true, onClose, title, children }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">

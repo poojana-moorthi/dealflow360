@@ -31,6 +31,30 @@ import BillingDetail from '../pages/billing/BillingDetail';
 
 // Negotiation
 import CustomerNegotiation from '../pages/negotiation/CustomerNegotiation';
+import CustomerNegotiationsHub from '../pages/negotiation/CustomerNegotiationsHub';
+import { useAuth } from '../context/AuthContext';
+
+function IndexRedirect() {
+  const { user } = useAuth();
+  if (user?.role === 'SALES_REP' || user?.role === 'ADMIN') {
+    return <Navigate to="/quotations" replace />;
+  }
+  if (user?.role === 'FINANCE') {
+    return <Navigate to="/finance" replace />;
+  }
+  if (user?.role === 'CUSTOMER') {
+    return <Navigate to="/portal/dashboard" replace />;
+  }
+  return <Navigate to="/quotations" replace />;
+}
+
+function DashboardRouteGuard() {
+  const { user } = useAuth();
+  if (user?.role === 'ADMIN' || user?.role === 'SALES_REP') {
+    return <Navigate to="/quotations" replace />;
+  }
+  return <SalesDashboard />;
+}
 
 // Invoices
 import InvoiceList from '../pages/invoices/InvoiceList';
@@ -84,12 +108,20 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<IndexRedirect />} />
         <Route
           path="dashboard"
           element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'SALES_REP', 'SALES_MANAGER', 'FINANCE', 'OPERATIONS']}>
-              <SalesDashboard />
+            <ProtectedRoute allowedRoles={['ADMIN', 'SALES_MANAGER', 'FINANCE', 'OPERATIONS']}>
+              <DashboardRouteGuard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="negotiations"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'SALES_REP', 'SALES_MANAGER']}>
+              <CustomerNegotiationsHub />
             </ProtectedRoute>
           }
         />
@@ -150,7 +182,7 @@ export function AppRoutes() {
         <Route
           path="fulfillment"
           element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'OPERATIONS', 'SALES_MANAGER']}>
+            <ProtectedRoute allowedRoles={['ADMIN', 'OPERATIONS', 'SALES_MANAGER', 'FINANCE']}>
               <FulfillmentSplitView />
             </ProtectedRoute>
           }
@@ -158,7 +190,7 @@ export function AppRoutes() {
         <Route
           path="fulfillment/:id"
           element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'OPERATIONS', 'SALES_MANAGER']}>
+            <ProtectedRoute allowedRoles={['ADMIN', 'OPERATIONS', 'SALES_MANAGER', 'FINANCE']}>
               <FulfillmentSplitView />
             </ProtectedRoute>
           }
@@ -266,7 +298,7 @@ export function AppRoutes() {
         <Route
           path="admin/discount-rules"
           element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
+            <ProtectedRoute allowedRoles={['ADMIN', 'SALES_MANAGER']}>
               <DiscountRulesSetup />
             </ProtectedRoute>
           }

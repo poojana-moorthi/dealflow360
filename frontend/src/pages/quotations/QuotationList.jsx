@@ -2,7 +2,21 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSales } from '../../context/SalesContext';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
-import { PlusCircle, Search, Filter, ArrowUpDown, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getCustomerEmail, getQuotationCustody } from '../../utils/quotationCustody';
+import {
+  PlusCircle,
+  Search,
+  Filter,
+  ArrowUpDown,
+  LayoutGrid,
+  List,
+  ChevronLeft,
+  ChevronRight,
+  Mail,
+  MessageSquare,
+  Sparkles,
+  ShieldCheck
+} from 'lucide-react';
 
 export function QuotationList() {
   const { quotations } = useSales();
@@ -24,8 +38,10 @@ export function QuotationList() {
   // Filtered & Sorted Quotations
   const filteredQuotations = useMemo(() => {
     let list = (quotations || []).filter(q => {
+      const customerEmail = getCustomerEmail(q.customer_id, q.customer_name);
       const matchSearch = q.quotation_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          q.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
+                          q.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          customerEmail.toLowerCase().includes(searchTerm.toLowerCase());
       if (!matchSearch) return false;
 
       if (stageFilter !== 'ALL') {
@@ -193,47 +209,57 @@ export function QuotationList() {
                       No quotes in {stage.title.toLowerCase()}
                     </div>
                   ) : (
-                    items.map((q) => (
-                      <Link
-                        key={q.id}
-                        to={`/quotations/${q.id}`}
-                        className="block bg-white border border-slate-200 hover:border-blue-400 rounded-lg p-3.5 shadow-xs transition hover:shadow-sm"
-                      >
-                        <div className="flex items-center justify-between text-xs mb-1.5">
-                          <span className="font-extrabold text-[#1565C0]">{q.quotation_number}</span>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              q.risk_score >= 70
-                                ? 'bg-rose-100 text-rose-800'
-                                : q.risk_score >= 40
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                          >
-                            Risk {q.risk_score}
-                          </span>
-                        </div>
-
-                        <div className="text-xs font-semibold text-slate-900 truncate mb-1">
-                          {q.customer_name}
-                        </div>
-
-                        <div className="text-sm font-extrabold text-slate-900 mb-2">
-                          ${(q.total_amount).toLocaleString()}
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-                          <span>Margin: <strong className="text-slate-700">{q.gross_margin_pct}%</strong></span>
-                          <span>Disc: <strong className="text-slate-700">{q.discount_pct}%</strong></span>
-                        </div>
-
-                        {q.approval_required && (
-                          <div className="mt-2 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded flex items-center gap-1">
-                            <span>Requires {q.required_approval_level}</span>
+                    items.map((q) => {
+                      const customerEmail = getCustomerEmail(q.customer_id, q.customer_name);
+                      const custody = getQuotationCustody(q);
+                      return (
+                        <Link
+                          key={q.id}
+                          to={`/quotations/${q.id}`}
+                          className="block bg-white border border-slate-200 hover:border-blue-400 rounded-lg p-3.5 shadow-xs transition hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between text-xs mb-1.5">
+                            <span className="font-extrabold text-[#1565C0]">{q.quotation_number}</span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                q.risk_score >= 70
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : q.risk_score >= 40
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              Risk {q.risk_score}
+                            </span>
                           </div>
-                        )}
-                      </Link>
-                    ))
+
+                          <div className="text-xs font-bold text-slate-900 truncate mb-0.5">
+                            {q.customer_name}
+                          </div>
+
+                          {/* Customer Email ID */}
+                          <div className="text-[11px] text-slate-600 flex items-center gap-1 font-mono mb-2 truncate bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                            <Mail className="w-3 h-3 text-blue-500 shrink-0" />
+                            <span className="truncate">{customerEmail}</span>
+                          </div>
+
+                          <div className="text-sm font-extrabold text-slate-900 mb-2 font-mono">
+                            ${(q.total_amount).toLocaleString()}
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100">
+                            <span>Margin: <strong className="text-emerald-700">{q.gross_margin_pct}%</strong></span>
+                            <span>Disc: <strong className="text-slate-700">{q.discount_pct}%</strong></span>
+                          </div>
+
+                          {/* Approval Custody & Reviewer Hands */}
+                          <div className="mt-2 text-[10px] font-bold py-1 px-1.5 rounded flex items-center gap-1 border border-slate-200 bg-white">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#1565C0] shrink-0"></span>
+                            <span className="text-slate-700 truncate">{custody.label}</span>
+                          </div>
+                        </Link>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -246,60 +272,65 @@ export function QuotationList() {
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
               <tr>
-                <th className="py-3 px-4">Quotation #</th>
-                <th className="py-3 px-4">Customer</th>
-                <th className="py-3 px-4">Total Amount</th>
-                <th className="py-3 px-4 text-center">Discount %</th>
-                <th className="py-3 px-4 text-center">Margin %</th>
-                <th className="py-3 px-4">Stage</th>
-                <th className="py-3 px-4 text-center">Risk Score</th>
-                <th className="py-3 px-4 text-center">Action</th>
+                <th className="py-3 px-3">Quotation #</th>
+                <th className="py-3 px-3">Customer</th>
+                <th className="py-3 px-3">Customer Email ID</th>
+                <th className="py-3 px-3">Approval & Custody</th>
+                <th className="py-3 px-3">Total Amount</th>
+                <th className="py-3 px-3 text-center">Discount %</th>
+                <th className="py-3 px-3 text-center">Margin %</th>
+                <th className="py-3 px-3 text-center">Risk</th>
+                <th className="py-3 px-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paginatedQuotations.map((q) => (
-                <tr key={q.id} className="hover:bg-slate-50 transition">
-                  <td className="py-3 px-4 font-bold text-[#1565C0]">
-                    <Link to={`/quotations/${q.id}`} className="hover:underline">
-                      {q.quotation_number}
-                    </Link>
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-900">{q.customer_name}</td>
-                  <td className="py-3 px-4 font-bold text-slate-900">${(q.total_amount).toLocaleString()}</td>
-                  <td className="py-3 px-4 text-center font-semibold text-slate-700">{q.discount_pct}%</td>
-                  <td className="py-3 px-4 text-center font-bold text-emerald-700">{q.gross_margin_pct}%</td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                      q.status === 'APPROVED' || q.status === 'WON'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : q.status === 'PENDING APPROVAL'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {q.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      q.risk_score >= 70
-                                ? 'bg-rose-100 text-rose-800'
-                                : q.risk_score >= 40
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-emerald-100 text-emerald-800'
-                    }`}>
-                      {q.risk_score}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <Link
-                      to={`/quotations/${q.id}`}
-                      className="px-2.5 py-1 bg-white border border-slate-300 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded text-xs font-semibold transition"
-                    >
-                      Inspect
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {paginatedQuotations.map((q) => {
+                const customerEmail = getCustomerEmail(q.customer_id, q.customer_name);
+                const custody = getQuotationCustody(q);
+                return (
+                  <tr key={q.id} className="hover:bg-slate-50 transition">
+                    <td className="py-3 px-3 font-bold text-[#1565C0]">
+                      <Link to={`/quotations/${q.id}`} className="hover:underline">
+                        {q.quotation_number}
+                      </Link>
+                    </td>
+                    <td className="py-3 px-3 font-semibold text-slate-900">{q.customer_name}</td>
+                    <td className="py-3 px-3 font-mono text-[11px] text-blue-700">
+                      <span className="flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-blue-500" />
+                        {customerEmail}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${custody.badgeClass}`}>
+                        {custody.label}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-bold text-slate-900 font-mono">${(q.total_amount).toLocaleString()}</td>
+                    <td className="py-3 px-3 text-center font-semibold text-slate-700">{q.discount_pct}%</td>
+                    <td className="py-3 px-3 text-center font-bold text-emerald-700">{q.gross_margin_pct}%</td>
+                    <td className="py-3 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        q.risk_score >= 70
+                          ? 'bg-rose-100 text-rose-800'
+                          : q.risk_score >= 40
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {q.risk_score}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <Link
+                        to={`/quotations/${q.id}`}
+                        className="px-2.5 py-1 bg-white border border-slate-300 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded text-xs font-semibold transition"
+                      >
+                        Inspect
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 

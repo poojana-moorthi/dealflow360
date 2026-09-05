@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSales } from '../../context/SalesContext';
 import { useAuth } from '../../context/AuthContext';
+import financeService from '../../services/financeService';
 import { Loader, Toast, Modal } from '../../components/common/Card';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { AlertCircle, CreditCard, Search, PlusCircle, CheckCircle, FileText, ArrowRight } from 'lucide-react';
+import { AlertCircle, CreditCard, Search, PlusCircle, CheckCircle, FileText, ArrowRight, Receipt, Plus } from 'lucide-react';
 
 export function InvoiceList() {
   const { invoices, recordPayment } = useSales();
@@ -15,6 +16,16 @@ export function InvoiceList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState('');
 
+  // Credit Notes State & Reconciliation
+  const [creditNotes, setCreditNotes] = useState(() => financeService.getCreditNotes());
+  const [showIssueCreditModal, setShowIssueCreditModal] = useState(false);
+  const [newCreditData, setNewCreditData] = useState({
+    customer_name: 'Acme Corp',
+    invoice_number: 'INV-1042',
+    amount: '',
+    reason: ''
+  });
+
   // Payment Modal
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState('');
@@ -22,6 +33,27 @@ export function InvoiceList() {
   const [txnRef, setTxnRef] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const handleReconcileCreditNote = (cnId) => {
+    const updated = financeService.reconcileCreditNote(cnId);
+    if (updated) {
+      setCreditNotes([...financeService.getCreditNotes()]);
+      setToastMessage(`Credit Note ${updated.credit_note_number} (${formatCurrency(updated.amount)}) reconciled against ${updated.invoice_number}`);
+    }
+  };
+
+  const handleIssueCreditNoteSubmit = (e) => {
+    e.preventDefault();
+    if (!newCreditData.amount || parseFloat(newCreditData.amount) <= 0) {
+      setToastMessage('Please enter a valid credit amount.');
+      return;
+    }
+    const created = financeService.issueCreditNote(newCreditData);
+    setCreditNotes([...financeService.getCreditNotes()]);
+    setShowIssueCreditModal(false);
+    setNewCreditData({ customer_name: 'Acme Corp', invoice_number: 'INV-1042', amount: '', reason: '' });
+    setToastMessage(`Credit Note ${created.credit_note_number} issued successfully for ${formatCurrency(created.amount)}.`);
+  };
 
   const unpaidCount = useMemo(() => {
     return invoices.filter(i => i.status === 'UNPAID' || i.status === 'PARTIALLY_PAID').length;
@@ -144,7 +176,7 @@ export function InvoiceList() {
         </div>
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto">
-          {['ALL', 'UNPAID', 'PAID'].map((flt) => (
+          {['ALL', 'UNPAID', 'PAID', 'CREDIT_NOTES'].map((flt) => (
             <button
               key={flt}
               onClick={() => setActiveFilter(flt)}
@@ -154,18 +186,104 @@ export function InvoiceList() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {flt === 'ALL' ? 'All Invoices' : flt}
+              {flt === 'ALL' ? 'All Invoices' : flt === 'CREDIT_NOTES' ? `Credit Notes (${creditNotes.length})` : flt}
             </button>
           ))}
+          {activeFilter === 'CREDIT_NOTES' && (
+            <button
+              type="button"
+              onClick={() => setShowIssueCreditModal(true)}
+              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded transition shadow-2xs flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Issue Credit Note</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Invoices Table matching Image 9 wireframe */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs">
-        <table className="w-full text-left text-xs border-collapse">
-          <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-            <tr>
-              <th className="py-3 px-4">Invoice #</th>
+      {activeFilter === 'CREDIT_NOTES' ? (
+        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs">
+          <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Commercial Credit Notes & Ledger Adjustments</h2>
+              <p className="text-[11px] text-slate-500">Service SLA credits, volume rebates, and contract proration adjustments</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowIssueCreditModal(true)}
+              className="px-2.5 py-1 bg-[#1565C0] hover:bg-blue-700 text-white text-xs font-bold rounded transition flex items-center gap-1 shadow-2xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Issue Credit Note</span>
+            </button>
+          </div>
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+              <tr>
+                <th className="py-3 px-4">Credit Note #</th>
+                <th className="py-3 px-4">Customer</th>
+                <th className="py-3 px-4">Applied Invoice</th>
+                <th className="py-3 px-4 text-right">Credit Amount</th>
+                <th className="py-3 px-4">Reason / Notes</th>
+                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4">Issue Date</th>
+                <th className="py-3 px-4 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {creditNotes.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-400 italic">No credit notes issued.</td>
+                </tr>
+              ) : (
+                creditNotes.map((cn) => {
+                  const isReconciled = cn.status === 'RECONCILED';
+                  return (
+                    <tr key={cn.id} className="hover:bg-slate-50 transition">
+                      <td className="py-3 px-4 font-bold text-[#1565C0] font-mono">{cn.credit_note_number}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-900">{cn.customer_name}</td>
+                      <td className="py-3 px-4 text-slate-700 font-mono">{cn.invoice_number}</td>
+                      <td className="py-3 px-4 text-right font-bold text-rose-600">-{formatCurrency(cn.amount)}</td>
+                      <td className="py-3 px-4 text-slate-600 max-w-xs truncate">{cn.reason}</td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          isReconciled ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {isReconciled ? 'Reconciled' : 'Pending'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-500 font-medium">{formatDate(cn.issue_date)}</td>
+                      <td className="py-3 px-4 text-center">
+                        {!isReconciled ? (
+                          <button
+                            type="button"
+                            onClick={() => handleReconcileCreditNote(cn.id)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-[11px] transition shadow-2xs cursor-pointer"
+                          >
+                            Reconcile
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-700 flex items-center justify-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>Applied</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* Invoices Table matching Image 9 wireframe */
+        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+              <tr>
+                <th className="py-3 px-4">Invoice #</th>
               <th className="py-3 px-4">Customer</th>
               <th className="py-3 px-4">Type</th>
               <th className="py-3 px-4 text-right">Total</th>
@@ -252,6 +370,7 @@ export function InvoiceList() {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Record Payment Modal */}
       {selectedInvoice && (
@@ -341,6 +460,89 @@ export function InvoiceList() {
               >
                 <CreditCard className="w-3.5 h-3.5" />
                 <span>{submitting ? 'Reconciling...' : 'Confirm Payment'}</span>
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Issue Credit Note Modal */}
+      {showIssueCreditModal && (
+        <Modal
+          title="Issue Commercial Credit Note"
+          onClose={() => setShowIssueCreditModal(false)}
+        >
+          <form onSubmit={handleIssueCreditNoteSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Customer Account</label>
+              <select
+                value={newCreditData.customer_name}
+                onChange={(e) => setNewCreditData({ ...newCreditData, customer_name: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded bg-white text-xs font-semibold"
+              >
+                <option value="Acme Corp">Acme Corp</option>
+                <option value="Zenith Health Systems">Zenith Health Systems</option>
+                <option value="TechCorp International">TechCorp International</option>
+                <option value="Delta Logistics LLC">Delta Logistics LLC</option>
+                <option value="Nova Technologies">Nova Technologies</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Associated Invoice Reference</label>
+              <select
+                value={newCreditData.invoice_number}
+                onChange={(e) => setNewCreditData({ ...newCreditData, invoice_number: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded bg-white text-xs font-mono font-semibold"
+              >
+                {invoices.map(inv => (
+                  <option key={inv.id} value={inv.invoice_number}>
+                    {inv.invoice_number} ({inv.customer_name} - {formatCurrency(inv.total)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Credit Amount ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="1"
+                required
+                placeholder="e.g. 500"
+                value={newCreditData.amount}
+                onChange={(e) => setNewCreditData({ ...newCreditData, amount: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded text-sm font-bold text-slate-800 focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Reason / Ledger Classification</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Service SLA Concession, Volume Rebate Adjustment, Hardware Delay"
+                value={newCreditData.reason}
+                onChange={(e) => setNewCreditData({ ...newCreditData, reason: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded text-xs"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowIssueCreditModal(false)}
+                className="px-3 py-1.5 border border-slate-300 text-slate-600 rounded text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 bg-[#1565C0] hover:bg-blue-700 text-white rounded text-xs font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Issue & Record Note</span>
               </button>
             </div>
           </form>

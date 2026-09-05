@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import approvalService from '../../services/approvalService';
 import { useSales } from '../../context/SalesContext';
+import { useAuth } from '../../context/AuthContext';
 import { Loader, Toast } from '../../components/common/Card';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { ArrowLeft, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
@@ -10,6 +11,8 @@ export function ApprovalDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { approvals, resolveApproval, persona } = useSales();
+  const { user } = useAuth();
+  const currentRole = user?.role || persona?.role || 'SALES_REP';
   const [data, setData] = useState(null);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
@@ -99,7 +102,12 @@ export function ApprovalDetail() {
   if (loading) return <Loader text="Loading governance review dossier..." />;
 
   const { approval = {}, quotation = {} } = data || {};
-  const isSalesRepresentative = persona.role === 'SALES_REP';
+  const isSalesRepresentative = currentRole === 'SALES_REP';
+  const canApprove =
+    currentRole === 'ADMIN' ||
+    (currentRole === 'SALES_MANAGER' && (approval.required_role === 'SALES_MANAGER' || !approval.required_role)) ||
+    (currentRole === 'FINANCE' && approval.required_role === 'FINANCE');
+  const isAlreadyDecided = approval.status === 'APPROVED' || approval.status === 'REJECTED';
 
   return (
     <div className="space-y-6">
@@ -134,11 +142,32 @@ export function ApprovalDetail() {
         </div>
       </div>
 
-      {isSalesRepresentative && (
+      {isSalesRepresentative ? (
         <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-lg text-xs text-amber-900 flex items-center gap-2 shadow-xs">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
             Acting as <strong>Sales Rep</strong>. Sales reps cannot self-approve high-risk discounts. Switch persona in the top nav to <strong>Sales Manager</strong> or <strong>Finance</strong> to approve or reject this quotation.
+          </span>
+        </div>
+      ) : !canApprove ? (
+        <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-lg text-xs text-blue-900 flex items-center gap-2 shadow-xs">
+          <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>
+            Acting as <strong>{currentRole}</strong>. This quotation requires sign-off from <strong>{approval.required_role || 'FINANCE'}</strong> due to high blended risk or margin threshold policies.
+          </span>
+        </div>
+      ) : isAlreadyDecided ? (
+        <div className="bg-slate-100 border border-slate-200 p-3.5 rounded-lg text-xs text-slate-800 flex items-center gap-2 shadow-xs">
+          <CheckCircle2 className="w-4 h-4 text-slate-600 shrink-0" />
+          <span>
+            This quotation has already been <strong>{approval.status}</strong>.
+          </span>
+        </div>
+      ) : (
+        <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-lg text-xs text-emerald-900 flex items-center gap-2 shadow-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>
+            Authorized Reviewer Active: <strong>{currentRole}</strong>. You have permissions to approve, reject, or return this quotation for revision.
           </span>
         </div>
       )}
@@ -234,21 +263,21 @@ export function ApprovalDetail() {
         <button
           type="button"
           onClick={() => handleAction('APPROVE')}
-          disabled={actionLoading || isSalesRepresentative}
-          className={`px-5 py-2 text-white text-xs font-bold rounded-md shadow-xs transition flex items-center gap-1.5 ${
-            isSalesRepresentative ? 'bg-slate-300 cursor-not-allowed text-slate-500' : 'bg-[#16A34A] hover:bg-green-700'
+          disabled={actionLoading || !canApprove || isAlreadyDecided}
+          className={`px-5 py-2 text-white text-xs font-bold rounded-md shadow-xs transition flex items-center gap-1.5 cursor-pointer ${
+            !canApprove || isAlreadyDecided ? 'bg-slate-300 cursor-not-allowed text-slate-500' : 'bg-[#16A34A] hover:bg-green-700'
           }`}
         >
           <CheckCircle2 className="w-4 h-4" />
-          <span>Approve</span>
+          <span>{approval.status === 'APPROVED' ? 'Approved' : 'Approve'}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleAction('REVISION')}
-          disabled={actionLoading || isSalesRepresentative}
-          className={`px-4 py-2 text-white text-xs font-bold rounded-md shadow-xs transition ${
-            isSalesRepresentative ? 'bg-slate-200 cursor-not-allowed text-slate-400' : 'bg-[#F59E0B] hover:bg-amber-600'
+          disabled={actionLoading || !canApprove || isAlreadyDecided}
+          className={`px-4 py-2 text-white text-xs font-bold rounded-md shadow-xs transition cursor-pointer ${
+            !canApprove || isAlreadyDecided ? 'bg-slate-200 cursor-not-allowed text-slate-400' : 'bg-[#F59E0B] hover:bg-amber-600'
           }`}
         >
           Return for Revision
@@ -257,12 +286,12 @@ export function ApprovalDetail() {
         <button
           type="button"
           onClick={() => handleAction('REJECT')}
-          disabled={actionLoading || isSalesRepresentative}
-          className={`px-4 py-2 text-white text-xs font-bold rounded-md shadow-xs transition ${
-            isSalesRepresentative ? 'bg-slate-200 cursor-not-allowed text-slate-400' : 'bg-[#DC2626] hover:bg-red-700'
+          disabled={actionLoading || !canApprove || isAlreadyDecided}
+          className={`px-4 py-2 text-white text-xs font-bold rounded-md shadow-xs transition cursor-pointer ${
+            !canApprove || isAlreadyDecided ? 'bg-slate-200 cursor-not-allowed text-slate-400' : 'bg-[#DC2626] hover:bg-red-700'
           }`}
         >
-          Reject
+          {approval.status === 'REJECTED' ? 'Rejected' : 'Reject'}
         </button>
       </div>
     </div>

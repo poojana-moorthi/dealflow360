@@ -13,40 +13,24 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  ExternalLink,
-  UserCheck,
   ChevronDown
 } from 'lucide-react';
 
 export function TopBar() {
-  const { user, logout, login, isSuperAdmin, switchRole } = useAuth();
-  const { persona, setPersona } = useSales();
+  const { user, logout } = useAuth();
+  const { persona } = useSales();
   const navigate = useNavigate();
   const location = useLocation();
   const [showAdminMenu, setShowAdminMenu] = useState(false);
 
   const currentRole = user?.role || persona?.role || 'SALES_REP';
 
-  const demoAccounts = [
-    { role: 'ADMIN', label: 'Admin', email: 'admin@dealflow360.com' },
-    { role: 'SALES_REP', label: 'Sales Rep', email: 'sales_rep@dealflow360.com' },
-    { role: 'SALES_MANAGER', label: 'Sales Manager', email: 'sales_manager@dealflow360.com' },
-    { role: 'FINANCE', label: 'Finance', email: 'finance@dealflow360.com' }
-  ];
-
-  const handleQuickSwitch = async (roleKey) => {
-    if (!isSuperAdmin) return;
-    setPersona(roleKey);
-    if (switchRole) {
-      switchRole(roleKey);
-    }
-  };
-
   const allNavTabs = [
-    { label: currentRole === 'FINANCE' ? 'Finance Ops' : 'Dashboard', path: currentRole === 'FINANCE' ? '/finance' : '/dashboard', roles: ['ADMIN', 'SALES_REP', 'SALES_MANAGER', 'FINANCE', 'OPERATIONS'] },
+    { label: currentRole === 'FINANCE' ? 'Finance Ops' : 'Dashboard', path: currentRole === 'FINANCE' ? '/finance' : '/dashboard', roles: ['SALES_MANAGER', 'FINANCE', 'OPERATIONS'] },
     { label: 'Quotations', path: '/quotations', roles: ['ADMIN', 'SALES_REP', 'SALES_MANAGER'] },
+    { label: 'Customer Responses', path: '/negotiations', roles: ['ADMIN', 'SALES_REP', 'SALES_MANAGER'] },
     { label: 'Approvals', path: '/approvals', roles: ['ADMIN', 'SALES_MANAGER', 'FINANCE'] },
-    { label: 'Fulfillment', path: '/fulfillment/1', roles: ['ADMIN', 'OPERATIONS', 'SALES_MANAGER'] },
+    { label: 'Discount Rules', path: '/admin/discount-rules', roles: ['ADMIN', 'SALES_MANAGER'] },
     { label: 'Subscriptions', path: '/subscriptions', roles: ['ADMIN', 'FINANCE'] },
     { label: 'Invoices', path: '/invoices', roles: ['ADMIN', 'FINANCE'] },
     { label: 'Deal Health', path: '/deal-health', roles: ['ADMIN', 'SALES_MANAGER', 'FINANCE'] },
@@ -75,47 +59,10 @@ export function TopBar() {
         </div>
 
         {/* Right Section: Persona Selector, User Tag, External Portal */}
+        {/* Right Section: User Profile & Actions */}
         <div className="flex items-center gap-3">
-          {/* Quick Persona Switcher - Admin Only */}
-          {isSuperAdmin ? (
-            <div className="flex items-center gap-1.5 bg-blue-800/80 px-2.5 py-1 rounded-md border border-blue-500/70 text-xs shadow-2xs">
-              <UserCheck className="w-3.5 h-3.5 text-blue-200" />
-              <span className="text-[11px] font-semibold text-blue-200 hidden sm:inline">Role:</span>
-              <select
-                value={currentRole}
-                onChange={(e) => handleQuickSwitch(e.target.value)}
-                className="text-xs bg-transparent text-white font-medium focus:outline-none cursor-pointer"
-              >
-                {demoAccounts.map(acc => (
-                  <option key={acc.role} value={acc.role} className="text-slate-900 bg-white">
-                    {acc.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 bg-blue-900/60 px-2.5 py-1 rounded-md border border-blue-500/40 text-xs">
-              <UserCheck className="w-3.5 h-3.5 text-blue-300" />
-              <span className="text-[11px] font-semibold text-blue-200">Role:</span>
-              <span className="font-bold text-white text-xs">
-                {demoAccounts.find(d => d.role === currentRole)?.label || currentRole}
-              </span>
-            </div>
-          )}
-
-          {/* Customer Portal Link */}
-          <a
-            href="/portal/login"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-600 px-2.5 py-1 rounded-md border border-blue-400/50 transition shadow-2xs"
-          >
-            <span>Customer Portal</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
-
           {/* Current User Role Pill */}
-          <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-blue-400/40 text-xs">
+          <div className="flex items-center gap-2 text-xs">
             <span className="font-semibold text-blue-100">{user?.name}</span>
             <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-white text-[#1565C0] rounded shadow-2xs">
               {currentRole}
@@ -126,7 +73,7 @@ export function TopBar() {
           <button
             onClick={() => { logout(); navigate('/login'); }}
             title="Logout"
-            className="p-1.5 text-blue-200 hover:text-white rounded hover:bg-blue-700 transition"
+            className="p-1.5 text-blue-200 hover:text-white rounded hover:bg-blue-700 transition cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
           </button>

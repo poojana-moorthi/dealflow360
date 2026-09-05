@@ -1,11 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import salesMockService from '../services/salesMockService';
 import financeService from '../services/financeService';
+import { useAuth } from './AuthContext';
 
 const SalesContext = createContext(null);
 
 export function SalesProvider({ children }) {
-  const [persona, setPersona] = useState(salesMockService.getPersona());
+  const auth = useAuth();
+  const userRole = auth?.user?.role || localStorage.getItem('dealflow360_primary_role') || 'SALES_REP';
+
+  const [persona, setPersona] = useState(() => {
+    salesMockService.setPersona(userRole);
+    return salesMockService.getPersona();
+  });
   const [quotations, setQuotations] = useState([...salesMockService.quotations]);
   const [approvals, setApprovals] = useState([...salesMockService.approvals]);
   const [auditEvents, setAuditEvents] = useState([...salesMockService.auditEvents]);
@@ -17,6 +24,14 @@ export function SalesProvider({ children }) {
   const [financeOverview, setFinanceOverview] = useState(financeService.getOverview());
   const [invoices, setInvoices] = useState([...financeService.invoices]);
   const [subscriptions, setSubscriptions] = useState([...financeService.subscriptions]);
+
+  // Synchronize persona whenever the authenticated user or their role switches
+  useEffect(() => {
+    if (auth?.user?.role) {
+      salesMockService.setPersona(auth.user.role);
+      setPersona(salesMockService.getPersona());
+    }
+  }, [auth?.user?.role]);
 
   const refreshState = () => {
     setQuotations([...salesMockService.quotations]);

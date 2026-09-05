@@ -56,6 +56,10 @@ export function Signup() {
         setTimeout(() => {
           if (user.role === 'CUSTOMER') {
             navigate('/portal/dashboard');
+          } else if (user.role === 'ADMIN' || user.role === 'SALES_REP') {
+            navigate('/quotations');
+          } else if (user.role === 'FINANCE') {
+            navigate('/finance');
           } else {
             navigate('/dashboard');
           }

@@ -79,12 +79,16 @@ export function AuthProvider({ children }) {
     } catch (err) {
       // Fallback demo users if offline
       const demoUsers = {
-        'sales_rep@dealflow360.com': { id: 2, name: 'Sales Manager', email: 'sales_rep@dealflow360.com', role: 'SALES_MANAGER' },
-        'sales_manager@dealflow360.com': { id: 3, name: 'Sales Rep', email: 'sales_manager@dealflow360.com', role: 'SALES_REP' },
+        'sales_rep@dealflow360.com': { id: 2, name: 'Sales Rep', email: 'sales_rep@dealflow360.com', role: 'SALES_REP' },
+        'sales_manager@dealflow360.com': { id: 3, name: 'Sales Manager', email: 'sales_manager@dealflow360.com', role: 'SALES_MANAGER' },
         'finance@dealflow360.com': { id: 4, name: 'Finance Lead', email: 'finance@dealflow360.com', role: 'FINANCE' },
         'admin@dealflow360.com': { id: 1, name: 'System Admin', email: 'admin@dealflow360.com', role: 'ADMIN' },
         'customer1@dealflow360.com': { id: 6, name: 'Johnathan Acme', email: 'customer1@dealflow360.com', role: 'CUSTOMER', customerId: 1, companyName: 'Acme Corporation' },
-        'customer@acme.com': { id: 6, name: 'Johnathan Acme', email: 'customer@acme.com', role: 'CUSTOMER', customerId: 1, companyName: 'Acme Corporation' }
+        'customer@acme.com': { id: 6, name: 'Johnathan Acme', email: 'customer@acme.com', role: 'CUSTOMER', customerId: 1, companyName: 'Acme Corporation' },
+        'customer2@dealflow360.com': { id: 7, name: 'Sarah Nova', email: 'customer2@dealflow360.com', role: 'CUSTOMER', customerId: 2, companyName: 'Nova Technologies' },
+        'customer3@dealflow360.com': { id: 8, name: 'Elena Rostova', email: 'customer3@dealflow360.com', role: 'CUSTOMER', customerId: 3, companyName: 'TechCorp International' },
+        'customer4@dealflow360.com': { id: 9, name: 'David Chen', email: 'customer4@dealflow360.com', role: 'CUSTOMER', customerId: 4, companyName: 'Delta Logistics LLC' },
+        'customer5@dealflow360.com': { id: 10, name: 'David Zenith', email: 'customer5@dealflow360.com', role: 'CUSTOMER', customerId: 5, companyName: 'Zenith Health Systems' }
       };
       if (demoUsers[email]) {
         const fallback = demoUsers[email];

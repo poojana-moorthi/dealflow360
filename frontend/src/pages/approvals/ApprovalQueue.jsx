@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSales } from '../../context/SalesContext';
+import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
 import { Toast } from '../../components/common/Card';
 import {
@@ -17,36 +18,46 @@ import {
 
 export function ApprovalQueue() {
   const { approvals, resolveApproval, persona } = useSales();
+  const { user } = useAuth();
   const navigate = useNavigate();
+
+  const currentRole = user?.role || persona?.role || 'SALES_REP';
+  const isSalesRepresentative = currentRole === 'SALES_REP';
 
   const [activeTab, setActiveTab] = useState('All');
   const [toastMessage, setToastMessage] = useState('');
 
-  // 18. Tab filtering logic
+  // Tab filtering logic
   const filteredApprovals = useMemo(() => {
     return approvals.filter(a => {
-      if (activeTab === 'My Pending') return a.status === 'PENDING' && (a.required_role === persona.role || persona.role === 'ADMIN');
+      if (activeTab === 'My Pending') return a.status === 'PENDING' && (a.required_role === currentRole || currentRole === 'ADMIN');
       if (activeTab === 'High Risk') return a.risk_score >= 70;
       if (activeTab === 'Approved') return a.status === 'APPROVED';
       if (activeTab === 'Rejected') return a.status === 'REJECTED';
       return true; // 'All'
     });
-  }, [approvals, activeTab, persona.role]);
+  }, [approvals, activeTab, currentRole]);
 
   const pendingCount = approvals.filter(a => a.status === 'PENDING').length;
   const highRiskCount = approvals.filter(a => a.risk_score >= 70 && a.status === 'PENDING').length;
   const approvedCount = approvals.filter(a => a.status === 'APPROVED').length;
   const rejectedCount = approvals.filter(a => a.status === 'REJECTED').length;
 
-  const isSalesRepresentative = persona.role === 'SALES_REP';
+  const canApproveItem = (app) => {
+    if (app.status !== 'PENDING') return false;
+    if (currentRole === 'ADMIN') return true;
+    if (currentRole === 'SALES_MANAGER' && (app.required_role === 'SALES_MANAGER' || !app.required_role)) return true;
+    if (currentRole === 'FINANCE' && app.required_role === 'FINANCE') return true;
+    return false;
+  };
 
   const handleApprove = (approvalId, quoteNum) => {
-    resolveApproval(approvalId, 'APPROVE', `Approved by ${persona.role}`);
+    resolveApproval(approvalId, 'APPROVE', `Approved by ${currentRole}`);
     setToastMessage(`Quotation ${quoteNum} approved successfully.`);
   };
 
   const handleReject = (approvalId, quoteNum) => {
-    resolveApproval(approvalId, 'REJECT', `Rejected by ${persona.role}`);
+    resolveApproval(approvalId, 'REJECT', `Rejected by ${currentRole}`);
     setToastMessage(`Quotation ${quoteNum} returned/rejected.`);
   };
 
@@ -146,8 +157,8 @@ export function ApprovalQueue() {
               filteredApprovals.map((app) => (
                 <tr key={app.id} className="hover:bg-slate-50/60 transition">
                   <td className="py-3 px-4 font-bold text-[#1565C0]">
-                    <Link to={`/quotations/${app.quotation_id}`} className="hover:underline">
-                      {app.quotation_number}
+                    <Link to={`/approvals/${app.id}`} className="hover:underline flex items-center gap-1">
+                      <span>{app.quotation_number}</span>
                     </Link>
                   </td>
                   <td className="py-3 px-4 font-semibold text-slate-900">{app.customer_name}</td>
@@ -179,31 +190,45 @@ export function ApprovalQueue() {
                   </td>
                   <td className="py-3 px-4 text-center">
                     {app.status === 'PENDING' ? (
-                      isSalesRepresentative ? (
-                        <span className="text-[11px] text-slate-400 font-medium italic">
-                          Awaiting {app.required_role}
-                        </span>
-                      ) : (
+                      canApproveItem(app) ? (
                         <div className="inline-flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleApprove(app.id, app.quotation_number)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded transition shadow-2xs"
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded transition shadow-2xs cursor-pointer"
                           >
                             Approve
                           </button>
                           <button
                             type="button"
                             onClick={() => handleReject(app.id, app.quotation_number)}
-                            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold rounded transition shadow-2xs"
+                            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold rounded transition shadow-2xs cursor-pointer"
                           >
                             Reject
                           </button>
+                          <Link
+                            to={`/approvals/${app.id}`}
+                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded transition"
+                          >
+                            Review
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-2">
+                          <span className="text-[11px] text-slate-400 font-medium italic">
+                            Awaiting {app.required_role}
+                          </span>
+                          <Link
+                            to={`/approvals/${app.id}`}
+                            className="text-xs font-semibold text-[#1565C0] hover:underline"
+                          >
+                            Review
+                          </Link>
                         </div>
                       )
                     ) : (
                       <Link
-                        to={`/quotations/${app.quotation_id}`}
+                        to={`/approvals/${app.id}`}
                         className="text-xs font-semibold text-[#1565C0] hover:underline"
                       >
                         Inspect

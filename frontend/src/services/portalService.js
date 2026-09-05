@@ -68,9 +68,9 @@ export const portalService = {
     }
 
     // Resilient Demo / Offline Customer Credentials Fallback
-    const isCustomerEmail = !email || email.toLowerCase().includes('customer') || email.toLowerCase().includes('acme');
+    const isCustomerEmail = !email || email.toLowerCase().includes('customer') || email.toLowerCase().includes('acme') || email.toLowerCase().includes('nova') || email.toLowerCase().includes('techcorp') || email.toLowerCase().includes('delta') || email.toLowerCase().includes('zenith');
     if (isCustomerEmail || password === 'Password123!') {
-      const demoCustomer = {
+      let demoCustomer = {
         id: 6,
         name: 'Johnathan Acme',
         email: email || 'customer1@dealflow360.com',
@@ -78,6 +78,43 @@ export const portalService = {
         customerId: 1,
         companyName: 'Acme Corporation'
       };
+      if (email && (email.includes('customer2') || email.toLowerCase().includes('nova'))) {
+        demoCustomer = {
+          id: 7,
+          name: 'Sarah Nova',
+          email: 'customer2@dealflow360.com',
+          role: 'CUSTOMER',
+          customerId: 2,
+          companyName: 'Nova Technologies'
+        };
+      } else if (email && (email.includes('customer3') || email.toLowerCase().includes('techcorp'))) {
+        demoCustomer = {
+          id: 8,
+          name: 'Elena Rostova',
+          email: 'customer3@dealflow360.com',
+          role: 'CUSTOMER',
+          customerId: 3,
+          companyName: 'TechCorp International'
+        };
+      } else if (email && (email.includes('customer4') || email.toLowerCase().includes('delta'))) {
+        demoCustomer = {
+          id: 9,
+          name: 'David Chen',
+          email: 'customer4@dealflow360.com',
+          role: 'CUSTOMER',
+          customerId: 4,
+          companyName: 'Delta Logistics LLC'
+        };
+      } else if (email && (email.includes('customer5') || email.toLowerCase().includes('zenith'))) {
+        demoCustomer = {
+          id: 10,
+          name: 'David Zenith',
+          email: 'customer5@dealflow360.com',
+          role: 'CUSTOMER',
+          customerId: 5,
+          companyName: 'Zenith Health Systems'
+        };
+      }
       const demoToken = 'demo-customer-portal-jwt-token';
       return {
         success: true,
@@ -89,7 +126,7 @@ export const portalService = {
       };
     }
 
-    throw new Error('Invalid customer credentials. Please use customer1@dealflow360.com / Password123!');
+    throw new Error('Invalid customer credentials. Please use customer1@dealflow360.com through customer5@dealflow360.com / Password123!');
   },
 
   /**
@@ -108,14 +145,25 @@ export const portalService = {
     // Fallback: Read from salesMockService, filtered for the active customer account
     const currentPortalUser = JSON.parse(localStorage.getItem('dealflow360_portal_user') || '{}');
     const userCustId = currentPortalUser.customerId || currentPortalUser.customer_id;
-    const isAcmeOrDemo = !userCustId || userCustId === 1 || (currentPortalUser.email && currentPortalUser.email.includes('customer1'));
 
     const allQuotes = salesMockService.quotations || [];
     let customerQuotes = [];
-    if (isAcmeOrDemo) {
+    if (userCustId === 2 || (currentPortalUser.email && currentPortalUser.email.includes('customer2'))) {
+      customerQuotes = allQuotes.filter(q => q.customer_id === 2 || (q.customer_name && q.customer_name.toLowerCase().includes('nova')));
+    } else if (userCustId === 3 || (currentPortalUser.email && currentPortalUser.email.includes('customer3'))) {
+      customerQuotes = allQuotes.filter(q => q.customer_id === 3 || (q.customer_name && q.customer_name.toLowerCase().includes('techcorp')));
+    } else if (userCustId === 4 || (currentPortalUser.email && currentPortalUser.email.includes('customer4'))) {
+      customerQuotes = allQuotes.filter(q => q.customer_id === 4 || (q.customer_name && q.customer_name.toLowerCase().includes('delta')));
+    } else if (userCustId === 5 || (currentPortalUser.email && currentPortalUser.email.includes('customer5'))) {
+      customerQuotes = allQuotes.filter(q => q.customer_id === 5 || (q.customer_name && q.customer_name.toLowerCase().includes('zenith')));
+    } else if (!userCustId || userCustId === 1 || (currentPortalUser.email && currentPortalUser.email.includes('customer1'))) {
       customerQuotes = allQuotes.filter(q => q.customer_id === 1 || (q.customer_name && q.customer_name.toLowerCase().includes('acme')));
     } else {
       customerQuotes = allQuotes.filter(q => q.customer_id === userCustId);
+    }
+
+    if (customerQuotes.length === 0 && allQuotes.length > 0) {
+      customerQuotes = allQuotes.slice(0, 3);
     }
 
     const sanitized = customerQuotes.map(sanitizeQuoteForCustomer);
@@ -132,6 +180,15 @@ export const portalService = {
     try {
       const res = await api.get(`/portal/quotations/${id}`);
       if (res && res.success && res.data) {
+        const storedNegs = getStoredNegotiations(res.data.id || id);
+        const existingIds = new Set((res.data.negotiations || []).map(n => n.id));
+        const merged = [...(res.data.negotiations || [])];
+        for (const sn of storedNegs) {
+          if (!existingIds.has(sn.id)) {
+            merged.unshift(sn);
+          }
+        }
+        res.data.negotiations = merged;
         return res;
       }
     } catch (err) {
@@ -249,7 +306,46 @@ export const portalService = {
         status: 'CONFIRMED'
       }
     };
+  },
+
+  /**
+   * Record a reply or revised counter proposal from Sales Rep to the Customer Procurement Portal
+   */
+  recordSalesRepMessage(quoteId, { comment, counterPrice, counterDiscountPct, userName = 'Alex Morgan (Sales Rep)' }) {
+    const numId = parseInt(quoteId, 10);
+    const negItem = {
+      id: `rep-${Date.now()}`,
+      role: 'SALES_REP',
+      user_name: userName,
+      counter_price: counterPrice ? parseFloat(counterPrice) : null,
+      counter_discount_pct: counterDiscountPct ? parseFloat(counterDiscountPct) : null,
+      comment: comment || 'Sales Rep revised terms submitted.',
+      created_at: new Date().toISOString()
+    };
+    saveStoredNegotiation(numId, negItem);
+
+    // If counterPrice is specified, also update total_amount and discount_pct in mock quotes
+    const quote = (salesMockService.quotations || []).find(q => q.id === numId);
+    if (quote) {
+      if (counterPrice) quote.total_amount = parseFloat(counterPrice);
+      if (counterDiscountPct) quote.discount_pct = parseFloat(counterDiscountPct);
+      quote.stage = 'NEGOTIATION';
+      quote.status = 'NEGOTIATION';
+      quote.notes = comment || `Sales Rep proposed revised terms: ${counterDiscountPct}% discount`;
+      quote.last_activity = 'Sales Rep replied to customer';
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent('dealflow360_portal_update', {
+        detail: { quoteId: numId, item: negItem }
+      }));
+    } catch (e) {
+      // ignore in non-browser env
+    }
+
+    return negItem;
   }
 };
 
+export { getStoredNegotiations, saveStoredNegotiation };
 export default portalService;
