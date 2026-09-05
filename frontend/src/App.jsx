@@ -1,19 +1,20 @@
-import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
+﻿import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { QuoteProvider } from './context/QuoteContext';
-import { CustomerPortalProvider } from './context/CustomerPortalContext';
-import AppRoutes from './routes/AppRoutes';
+import Login from './pages/auth/Login';
+import Signup from './pages/auth/Signup';
+import CustomerPortalLogin from './pages/portal/CustomerPortalLogin';
 
 export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <QuoteProvider>
-          <CustomerPortalProvider>
-            <AppRoutes />
-          </CustomerPortalProvider>
-        </QuoteProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/portal/login" element={<CustomerPortalLogin />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
       </AuthProvider>
     </BrowserRouter>
   );
