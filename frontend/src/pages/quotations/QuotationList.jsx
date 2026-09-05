@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSales } from '../../context/SalesContext';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
-import { PlusCircle, Search, Filter, ArrowUpDown, LayoutGrid, List } from 'lucide-react';
+import { PlusCircle, Search, Filter, ArrowUpDown, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function QuotationList() {
   const { quotations } = useSales();
@@ -13,10 +13,17 @@ export function QuotationList() {
   const [stageFilter, setStageFilter] = useState('ALL');
   const [riskFilter, setRiskFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('Recently Updated');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, stageFilter, riskFilter, sortBy]);
 
   // Filtered & Sorted Quotations
   const filteredQuotations = useMemo(() => {
-    let list = quotations.filter(q => {
+    let list = (quotations || []).filter(q => {
       const matchSearch = q.quotation_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           q.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
       if (!matchSearch) return false;
@@ -48,6 +55,12 @@ export function QuotationList() {
     return list;
   }, [quotations, searchTerm, stageFilter, riskFilter, sortBy]);
 
+  const totalPages = Math.ceil(filteredQuotations.length / pageSize) || 1;
+  const paginatedQuotations = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredQuotations.slice(start, start + pageSize);
+  }, [filteredQuotations, currentPage, pageSize]);
+
   // 5 Pipeline Stage Columns defined in Wireframe (Image 1)
   const stages = [
     { key: 'DRAFT', title: 'Draft', filter: (q) => q.status === 'DRAFT' },
@@ -62,7 +75,12 @@ export function QuotationList() {
       {/* Title & Actions Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quotations Pipeline</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quotations Pipeline</h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-[#1565C0] font-extrabold text-xs">
+              {quotations?.length || 0} Deals
+            </span>
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
             Every quotation across the sales pipeline, one card or row per deal
           </p>
@@ -80,7 +98,7 @@ export function QuotationList() {
           <button
             type="button"
             onClick={() => setViewMode(viewMode === 'BOARD' ? 'TABLE' : 'BOARD')}
-            className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-md shadow-xs transition flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-md shadow-xs transition flex items-center gap-1.5 cursor-pointer"
           >
             {viewMode === 'BOARD' ? <List className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
             <span>{viewMode === 'BOARD' ? 'Switch to Table View' : 'Switch to Board View'}</span>
@@ -109,9 +127,9 @@ export function QuotationList() {
             <select
               value={stageFilter}
               onChange={(e) => setStageFilter(e.target.value)}
-              className="px-2 py-1 border border-slate-300 rounded bg-white font-medium text-slate-800 text-xs"
+              className="px-2 py-1 border border-slate-300 rounded bg-white font-medium text-slate-800 text-xs cursor-pointer"
             >
-              <option value="ALL">All Stages</option>
+              <option value="ALL">All Stages ({filteredQuotations.length})</option>
               <option value="DRAFT">Draft</option>
               <option value="PENDING">Pending Approval</option>
               <option value="APPROVED">Approved</option>
@@ -125,7 +143,7 @@ export function QuotationList() {
             <select
               value={riskFilter}
               onChange={(e) => setRiskFilter(e.target.value)}
-              className="px-2 py-1 border border-slate-300 rounded bg-white font-medium text-slate-800 text-xs"
+              className="px-2 py-1 border border-slate-300 rounded bg-white font-medium text-slate-800 text-xs cursor-pointer"
             >
               <option value="ALL">All Risk Levels</option>
               <option value="HIGH">High Risk (70+)</option>
@@ -139,7 +157,7 @@ export function QuotationList() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-2 py-1 border border-slate-300 rounded bg-white font-medium text-slate-800 text-xs"
+              className="px-2 py-1 border border-slate-300 rounded bg-white font-medium text-slate-800 text-xs cursor-pointer"
             >
               <option value="Recently Updated">Recently Updated</option>
               <option value="Highest Value">Highest Value</option>
@@ -158,7 +176,7 @@ export function QuotationList() {
             return (
               <div
                 key={stage.key}
-                className="bg-[#FAFAFA] border border-slate-300 rounded-xl p-3.5 min-h-[440px] flex flex-col shadow-xs"
+                className="bg-[#FAFAFA] border border-slate-300 rounded-xl p-3.5 flex flex-col shadow-xs"
               >
                 <div className="flex items-center justify-between mb-3 px-1">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
@@ -169,7 +187,7 @@ export function QuotationList() {
                   </span>
                 </div>
 
-                <div className="space-y-2.5 flex-1">
+                <div className="space-y-2.5 flex-1 max-h-[640px] overflow-y-auto pr-1">
                   {items.length === 0 ? (
                     <div className="border border-dashed border-slate-300 rounded-lg p-4 text-center text-xs text-slate-400">
                       No quotes in {stage.title.toLowerCase()}
@@ -179,23 +197,39 @@ export function QuotationList() {
                       <Link
                         key={q.id}
                         to={`/quotations/${q.id}`}
-                        className="block bg-white border border-slate-200 hover:border-blue-500 rounded-lg p-3 shadow-2xs hover:shadow-xs transition group cursor-pointer space-y-1.5"
+                        className="block bg-white border border-slate-200 hover:border-blue-400 rounded-lg p-3.5 shadow-xs transition hover:shadow-sm"
                       >
-                        <div className="text-xs font-bold text-slate-900 group-hover:text-[#1565C0] transition">
-                          {q.customer_name}
-                        </div>
-                        <div className="text-sm font-black text-slate-900 font-mono">
-                          ${(q.total_amount).toLocaleString()}
-                        </div>
-                        <div className="text-[11px] text-slate-500 flex justify-between items-center pt-1 border-t border-slate-100">
-                          <span className="font-mono text-[10px] text-slate-400">{q.quotation_number}</span>
-                          <span className={`font-bold ${q.gross_margin_pct >= 30 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                            {q.gross_margin_pct}% margin
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className="font-extrabold text-[#1565C0]">{q.quotation_number}</span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              q.risk_score >= 70
+                                ? 'bg-rose-100 text-rose-800'
+                                : q.risk_score >= 40
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            Risk {q.risk_score}
                           </span>
                         </div>
-                        {q.risk_score >= 70 && (
-                          <div className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 inline-block">
-                            Risk {q.risk_score} • {q.required_approval_level}
+
+                        <div className="text-xs font-semibold text-slate-900 truncate mb-1">
+                          {q.customer_name}
+                        </div>
+
+                        <div className="text-sm font-extrabold text-slate-900 mb-2">
+                          ${(q.total_amount).toLocaleString()}
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                          <span>Margin: <strong className="text-slate-700">{q.gross_margin_pct}%</strong></span>
+                          <span>Disc: <strong className="text-slate-700">{q.discount_pct}%</strong></span>
+                        </div>
+
+                        {q.approval_required && (
+                          <div className="mt-2 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded flex items-center gap-1">
+                            <span>Requires {q.required_approval_level}</span>
                           </div>
                         )}
                       </Link>
@@ -223,7 +257,7 @@ export function QuotationList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredQuotations.map((q) => (
+              {paginatedQuotations.map((q) => (
                 <tr key={q.id} className="hover:bg-slate-50 transition">
                   <td className="py-3 px-4 font-bold text-[#1565C0]">
                     <Link to={`/quotations/${q.id}`} className="hover:underline">
@@ -248,10 +282,10 @@ export function QuotationList() {
                   <td className="py-3 px-4 text-center">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                       q.risk_score >= 70
-                        ? 'bg-rose-100 text-rose-800'
-                        : q.risk_score >= 40
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-rose-100 text-rose-800'
+                                : q.risk_score >= 40
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-emerald-100 text-emerald-800'
                     }`}>
                       {q.risk_score}
                     </span>
@@ -268,6 +302,41 @@ export function QuotationList() {
               ))}
             </tbody>
           </table>
+
+          {/* Pagination Footer */}
+          <div className="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <span className="text-slate-600">
+              Showing <strong className="text-slate-900">{filteredQuotations.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> to{' '}
+              <strong className="text-slate-900">{Math.min(currentPage * pageSize, filteredQuotations.length)}</strong> of{' '}
+              <strong className="text-slate-900">{filteredQuotations.length}</strong> quotations
+            </span>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="px-2.5 py-1 bg-white border border-slate-300 rounded text-slate-700 font-medium hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Prev</span>
+                </button>
+                <span className="px-2 text-slate-600 font-semibold">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="px-2.5 py-1 bg-white border border-slate-300 rounded text-slate-700 font-medium hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-1"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -67,6 +67,9 @@ export function SalesDashboard() {
   };
 
   const getGreetingName = () => {
+    if (user?.name && user.name !== 'User' && user.name !== 'Sales Rep') {
+      return `${user.name} (${currentRole.replace(/_/g, ' ')})`;
+    }
     if (currentRole === 'ADMIN') return 'System Administrator';
     if (currentRole === 'SALES_MANAGER') return 'Sarah Connor (Sales Director)';
     if (currentRole === 'FINANCE') return 'David Miller (VP Finance)';
