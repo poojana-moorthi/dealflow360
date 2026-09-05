@@ -1,0 +1,52 @@
+-- DealFlow360 Phase 1 Database Schema (Authentication & Users)
+CREATE DATABASE IF NOT EXISTS dealflow360 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE dealflow360;
+
+-- 1. USERS TABLE
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(191) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('ADMIN', 'SALES_REP', 'SALES_MANAGER', 'FINANCE', 'OPERATIONS', 'CUSTOMER') NOT NULL,
+  customer_id INT NULL,
+  phone VARCHAR(50) NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_users_role (role),
+  INDEX idx_users_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2. CUSTOMERS TABLE (Referenced by customer accounts)
+CREATE TABLE IF NOT EXISTS customers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  company_name VARCHAR(200) NOT NULL,
+  contact_name VARCHAR(150) NOT NULL,
+  email VARCHAR(191) NOT NULL,
+  phone VARCHAR(50) NOT NULL,
+  tier ENUM('BRONZE', 'SILVER', 'GOLD', 'ENTERPRISE') NOT NULL DEFAULT 'BRONZE',
+  address VARCHAR(255) NULL,
+  city VARCHAR(100) NOT NULL,
+  state VARCHAR(100) NOT NULL,
+  country VARCHAR(100) NOT NULL DEFAULT 'India',
+  status ENUM('ACTIVE', 'INACTIVE', 'SUSPENDED') DEFAULT 'ACTIVE',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_customers_tier (tier)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3. AUDIT LOGS TABLE
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NULL,
+  role VARCHAR(50) NULL,
+  action VARCHAR(100) NOT NULL,
+  entity VARCHAR(100) NOT NULL,
+  entity_id INT NULL,
+  reason TEXT NULL,
+  metadata_json JSON NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_user (user_id),
+  INDEX idx_audit_action (action)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
