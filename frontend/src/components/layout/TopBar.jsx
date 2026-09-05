@@ -19,44 +19,42 @@ import {
 } from 'lucide-react';
 
 export function TopBar() {
-  const { user, logout, login } = useAuth();
+  const { user, logout, login, isSuperAdmin, switchRole } = useAuth();
   const { persona, setPersona } = useSales();
   const navigate = useNavigate();
   const location = useLocation();
   const [showAdminMenu, setShowAdminMenu] = useState(false);
 
-  const currentRole = persona?.role || user?.role || 'SALES_REP';
+  const currentRole = user?.role || persona?.role || 'SALES_REP';
 
   const demoAccounts = [
+    { role: 'ADMIN', label: 'Admin', email: 'admin@dealflow360.com' },
     { role: 'SALES_REP', label: 'Sales Rep', email: 'sales_rep@dealflow360.com' },
     { role: 'SALES_MANAGER', label: 'Sales Manager', email: 'sales_manager@dealflow360.com' },
-    { role: 'FINANCE', label: 'Finance', email: 'finance@dealflow360.com' },
-    { role: 'ADMIN', label: 'Admin', email: 'admin@dealflow360.com' }
+    { role: 'FINANCE', label: 'Finance', email: 'finance@dealflow360.com' }
   ];
 
   const handleQuickSwitch = async (roleKey) => {
+    if (!isSuperAdmin) return;
     setPersona(roleKey);
-    const target = demoAccounts.find(d => d.role === roleKey);
-    if (target && login) {
-      try {
-        await login(target.email, 'Password123!');
-      } catch (err) {
-        // Fallback for mock mode without crashing
-      }
+    if (switchRole) {
+      switchRole(roleKey);
     }
   };
 
-  const navTabs = [
-    { label: 'Dashboard', path: '/dashboard' },
-    { label: 'Quotations', path: '/quotations' },
-    { label: 'Approvals', path: '/approvals' },
-    { label: 'Fulfillment', path: '/fulfillment/1' },
-    { label: 'Subscriptions', path: '/subscriptions' },
-    { label: 'Invoices', path: '/invoices' },
-    { label: 'Deal Health', path: '/deal-health' },
-    { label: 'Reports', path: '/reporting' },
-    { label: 'Product', path: '/admin/products' }
+  const allNavTabs = [
+    { label: currentRole === 'FINANCE' ? 'Finance Ops' : 'Dashboard', path: currentRole === 'FINANCE' ? '/finance' : '/dashboard', roles: ['ADMIN', 'SALES_REP', 'SALES_MANAGER', 'FINANCE', 'OPERATIONS'] },
+    { label: 'Quotations', path: '/quotations', roles: ['ADMIN', 'SALES_REP', 'SALES_MANAGER'] },
+    { label: 'Approvals', path: '/approvals', roles: ['ADMIN', 'SALES_MANAGER', 'FINANCE'] },
+    { label: 'Fulfillment', path: '/fulfillment/1', roles: ['ADMIN', 'OPERATIONS', 'SALES_MANAGER'] },
+    { label: 'Subscriptions', path: '/subscriptions', roles: ['ADMIN', 'FINANCE'] },
+    { label: 'Invoices', path: '/invoices', roles: ['ADMIN', 'FINANCE'] },
+    { label: 'Deal Health', path: '/deal-health', roles: ['ADMIN', 'SALES_MANAGER', 'FINANCE'] },
+    { label: 'Reports', path: '/reporting', roles: ['ADMIN', 'SALES_MANAGER', 'FINANCE'] },
+    { label: 'Product', path: '/admin/products', roles: ['ADMIN'] }
   ];
+
+  const navTabs = allNavTabs.filter(tab => tab.roles.includes(currentRole));
 
   return (
     <header className="bg-[#1565C0] text-white shadow-md z-30 shrink-0">
@@ -78,22 +76,32 @@ export function TopBar() {
 
         {/* Right Section: Persona Selector, User Tag, External Portal */}
         <div className="flex items-center gap-3">
-          {/* Quick Persona Switcher */}
-          <div className="flex items-center gap-1.5 bg-blue-800/80 px-2.5 py-1 rounded-md border border-blue-500/70 text-xs">
-            <UserCheck className="w-3.5 h-3.5 text-blue-200" />
-            <span className="text-[11px] font-semibold text-blue-200 hidden sm:inline">Role:</span>
-            <select
-              value={currentRole}
-              onChange={(e) => handleQuickSwitch(e.target.value)}
-              className="text-xs bg-transparent text-white font-medium focus:outline-none cursor-pointer"
-            >
-              {demoAccounts.map(acc => (
-                <option key={acc.role} value={acc.role} className="text-slate-900 bg-white">
-                  {acc.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Quick Persona Switcher - Admin Only */}
+          {isSuperAdmin ? (
+            <div className="flex items-center gap-1.5 bg-blue-800/80 px-2.5 py-1 rounded-md border border-blue-500/70 text-xs shadow-2xs">
+              <UserCheck className="w-3.5 h-3.5 text-blue-200" />
+              <span className="text-[11px] font-semibold text-blue-200 hidden sm:inline">Role:</span>
+              <select
+                value={currentRole}
+                onChange={(e) => handleQuickSwitch(e.target.value)}
+                className="text-xs bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+              >
+                {demoAccounts.map(acc => (
+                  <option key={acc.role} value={acc.role} className="text-slate-900 bg-white">
+                    {acc.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-blue-900/60 px-2.5 py-1 rounded-md border border-blue-500/40 text-xs">
+              <UserCheck className="w-3.5 h-3.5 text-blue-300" />
+              <span className="text-[11px] font-semibold text-blue-200">Role:</span>
+              <span className="font-bold text-white text-xs">
+                {demoAccounts.find(d => d.role === currentRole)?.label || currentRole}
+              </span>
+            </div>
+          )}
 
           {/* Customer Portal Link */}
           <a
@@ -159,6 +167,13 @@ export function TopBar() {
                 onMouseLeave={() => setShowAdminMenu(false)}
               >
                 <NavLink
+                  to="/admin"
+                  onClick={() => setShowAdminMenu(false)}
+                  className="block px-3 py-2 hover:bg-blue-50 font-medium text-slate-700 hover:text-blue-700"
+                >
+                  Admin Console
+                </NavLink>
+                <NavLink
                   to="/admin/products"
                   onClick={() => setShowAdminMenu(false)}
                   className="block px-3 py-2 hover:bg-blue-50 font-medium text-slate-700 hover:text-blue-700"
@@ -171,6 +186,13 @@ export function TopBar() {
                   className="block px-3 py-2 hover:bg-blue-50 font-medium text-slate-700 hover:text-blue-700"
                 >
                   Discount Matrix
+                </NavLink>
+                <NavLink
+                  to="/admin/audit-log"
+                  onClick={() => setShowAdminMenu(false)}
+                  className="block px-3 py-2 hover:bg-blue-50 font-medium text-slate-700 hover:text-blue-700"
+                >
+                  Governance Audit Log
                 </NavLink>
               </div>
             )}

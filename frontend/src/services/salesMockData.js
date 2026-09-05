@@ -144,21 +144,21 @@ export const INITIAL_CUSTOMERS = [
 ];
 
 export const INITIAL_PRODUCTS = [
-  { id: 1, name: 'Laptop Pro 14', sku: 'HW-LP-14', category: 'Hardware', unit_price: 2400, unit_cost: 1600, max_discount: 15, stock: 48, billing_type: 'ONE_TIME', unit: 'Each' },
-  { id: 2, name: 'Laptop Pro 16 Max', sku: 'HW-LP-16', category: 'Hardware', unit_price: 3200, unit_cost: 2100, max_discount: 15, stock: 32, billing_type: 'ONE_TIME', unit: 'Each' },
-  { id: 3, name: 'Enterprise Workstation Z8', sku: 'HW-WS-Z8', category: 'Hardware', unit_price: 4500, unit_cost: 2900, max_discount: 12, stock: 15, billing_type: 'ONE_TIME', unit: 'Each' },
-  { id: 4, name: 'Thunderbolt Docking Station', sku: 'HW-DK-04', category: 'Hardware', unit_price: 280, unit_cost: 160, max_discount: 15, stock: 120, billing_type: 'ONE_TIME', unit: 'Each' },
-  { id: 5, name: 'Wireless Ergonomic Mouse & Keyboard', sku: 'HW-AC-02', category: 'Accessories', unit_price: 120, unit_cost: 65, max_discount: 20, stock: 250, billing_type: 'ONE_TIME', unit: 'Set' },
-  { id: 6, name: 'Onsite Deployment & Setup', sku: 'SV-STP-01', category: 'Services', unit_price: 450, unit_cost: 220, max_discount: 10, stock: 999, billing_type: 'ONE_TIME', unit: 'Hour' },
-  { id: 7, name: 'Executive Architecture Consulting', sku: 'SV-CNS-01', category: 'Services', unit_price: 2500, unit_cost: 1200, max_discount: 10, stock: 999, billing_type: 'ONE_TIME', unit: 'Day' },
-  { id: 8, name: 'Care Plan 2yr (Extended Warranty + SLA)', sku: 'SB-CR-2Y', category: 'Subscription', unit_price: 46, unit_cost: 18, max_discount: 10, stock: 999, billing_type: 'RECURRING', frequency: 'Monthly', unit: 'Month' },
-  { id: 9, name: 'Enterprise Support SLA 24/7', sku: 'SB-SLA-24', category: 'Subscription', unit_price: 300, unit_cost: 110, max_discount: 10, stock: 999, billing_type: 'RECURRING', frequency: 'Monthly', unit: 'Month' },
-  { id: 10, name: 'Managed Endpoint Security Suite', sku: 'SB-SEC-01', category: 'Subscription', unit_price: 25, unit_cost: 9, max_discount: 12, stock: 999, billing_type: 'RECURRING', frequency: 'Monthly', unit: 'User/Mo' },
-  { id: 11, name: 'Ultra-Wide 34" Curved Monitor', sku: 'HW-MN-34', category: 'Hardware', unit_price: 850, unit_cost: 540, max_discount: 15, stock: 65, billing_type: 'ONE_TIME', unit: 'Each' },
-  { id: 12, name: 'Server Rackmount Node 2U', sku: 'HW-SRV-2U', category: 'Hardware', unit_price: 6800, unit_cost: 4400, max_discount: 10, stock: 12, billing_type: 'ONE_TIME', unit: 'Each' },
-  { id: 13, name: 'Network Switch 48-Port PoE+', sku: 'HW-NET-48', category: 'Hardware', unit_price: 1850, unit_cost: 1150, max_discount: 15, stock: 24, billing_type: 'ONE_TIME', unit: 'Each' },
-  { id: 14, name: 'Data Migration & Pipeline Integration', sku: 'SV-MIG-01', category: 'Services', unit_price: 3800, unit_cost: 1900, max_discount: 10, stock: 999, billing_type: 'ONE_TIME', unit: 'Project' },
-  { id: 15, name: 'Annual Training & Onboarding Pack', sku: 'SV-TRN-01', category: 'Services', unit_price: 1500, unit_cost: 600, max_discount: 15, stock: 999, billing_type: 'ONE_TIME', unit: 'Package' }
+  { id: 1, name: 'Laptop Pro 14', sku: 'HW-LP-14', category: 'Hardware', unit_price: 2400, unit_cost: 1600, max_discount: 15, stock: 48, billing_type: 'ONE_TIME', unit: 'Each', status: 'Active', variants: 3, updated_at: '2026-09-04T12:00:00Z' },
+  { id: 2, name: 'Laptop Pro 16 Max', sku: 'HW-LP-16', category: 'Hardware', unit_price: 3200, unit_cost: 2100, max_discount: 15, stock: 32, billing_type: 'ONE_TIME', unit: 'Each', status: 'Active', variants: 2, updated_at: '2026-09-03T11:00:00Z' },
+  { id: 3, name: 'Enterprise Workstation Z8', sku: 'HW-WS-Z8', category: 'Hardware', unit_price: 4500, unit_cost: 2900, max_discount: 12, stock: 15, billing_type: 'ONE_TIME', unit: 'Each', status: 'Active', variants: 4, updated_at: '2026-09-02T15:30:00Z' },
+  { id: 4, name: 'Thunderbolt Docking Station', sku: 'HW-DK-04', category: 'Hardware', unit_price: 280, unit_cost: 160, max_discount: 15, stock: 120, billing_type: 'ONE_TIME', unit: 'Each', status: 'Active', variants: 2, updated_at: '2026-09-01T09:00:00Z' },
+  { id: 5, name: 'Wireless Ergonomic Mouse & Keyboard', sku: 'HW-AC-02', category: 'Accessories', unit_price: 120, unit_cost: 65, max_discount: 20, stock: 250, billing_type: 'ONE_TIME', unit: 'Set', status: 'Active', variants: 1, updated_at: '2026-08-30T10:00:00Z' },
+  { id: 6, name: 'Onsite Deployment & Setup', sku: 'SV-STP-01', category: 'Services', unit_price: 450, unit_cost: 220, max_discount: 10, stock: 999, billing_type: 'ONE_TIME', unit: 'Hour', status: 'Active', variants: 0, updated_at: '2026-08-28T14:20:00Z' },
+  { id: 7, name: 'Executive Architecture Consulting', sku: 'SV-CNS-01', category: 'Services', unit_price: 2500, unit_cost: 1200, max_discount: 10, stock: 999, billing_type: 'ONE_TIME', unit: 'Day', status: 'Active', variants: 0, updated_at: '2026-08-25T16:00:00Z' },
+  { id: 8, name: 'Care Plan 2yr (Extended Warranty + SLA)', sku: 'SB-CR-2Y', category: 'Subscription', unit_price: 46, unit_cost: 18, max_discount: 10, stock: 999, billing_type: 'RECURRING', frequency: 'Monthly', unit: 'Month', status: 'Active', variants: 0, updated_at: '2026-08-22T08:30:00Z' },
+  { id: 9, name: 'Enterprise Support SLA 24/7', sku: 'SB-SLA-24', category: 'Subscription', unit_price: 300, unit_cost: 110, max_discount: 10, stock: 999, billing_type: 'RECURRING', frequency: 'Monthly', unit: 'Month', status: 'Active', variants: 0, updated_at: '2026-08-20T17:00:00Z' },
+  { id: 10, name: 'Managed Endpoint Security Suite', sku: 'SB-SEC-01', category: 'Subscription', unit_price: 25, unit_cost: 9, max_discount: 12, stock: 999, billing_type: 'RECURRING', frequency: 'Monthly', unit: 'User/Mo', status: 'Active', variants: 0, updated_at: '2026-08-18T10:15:00Z' },
+  { id: 11, name: 'Ultra-Wide 34" Curved Monitor', sku: 'HW-MN-34', category: 'Hardware', unit_price: 850, unit_cost: 540, max_discount: 15, stock: 65, billing_type: 'ONE_TIME', unit: 'Each', status: 'Active', variants: 2, updated_at: '2026-08-15T11:45:00Z' },
+  { id: 12, name: 'Server Rackmount Node 2U', sku: 'HW-SRV-2U', category: 'Hardware', unit_price: 6800, unit_cost: 4400, max_discount: 10, stock: 12, billing_type: 'ONE_TIME', unit: 'Each', status: 'Active', variants: 2, updated_at: '2026-08-12T13:00:00Z' },
+  { id: 13, name: 'Network Switch 48-Port PoE+', sku: 'HW-NET-48', category: 'Hardware', unit_price: 1850, unit_cost: 1150, max_discount: 15, stock: 24, billing_type: 'ONE_TIME', unit: 'Each', status: 'Active', variants: 1, updated_at: '2026-08-10T09:30:00Z' },
+  { id: 14, name: 'Data Migration & Pipeline Integration', sku: 'SV-MIG-01', category: 'Services', unit_price: 3800, unit_cost: 1900, max_discount: 10, stock: 999, billing_type: 'ONE_TIME', unit: 'Project', status: 'Active', variants: 0, updated_at: '2026-08-08T15:00:00Z' },
+  { id: 15, name: 'Annual Training & Onboarding Pack', sku: 'SV-TRN-01', category: 'Services', unit_price: 1500, unit_cost: 600, max_discount: 15, stock: 999, billing_type: 'ONE_TIME', unit: 'Package', status: 'Active', variants: 0, updated_at: '2026-08-05T14:00:00Z' }
 ];
 
 export const INITIAL_DISCOUNT_RULES = {
@@ -166,18 +166,25 @@ export const INITIAL_DISCOUNT_RULES = {
     Bronze: 5,
     Silver: 10,
     Gold: 15,
+    Enterprise: 20,
     Platinum: 20
   },
   category_ceilings: {
     Hardware: 15,
     Services: 10,
+    Cloud: 12,
+    Software: 15,
     Subscription: 10,
     Accessories: 20
+  },
+  margin_floor: {
+    target: 30,
+    minimum: 25
   },
   approval_matrix: [
     { condition: 'Within tier and category limit', action: 'No approval needed', level: 'SALES_REP', color: 'emerald' },
     { condition: 'Over limit, blended risk medium (40-69)', action: 'Sales Manager Approval', level: 'SALES_MANAGER', color: 'blue' },
-    { condition: 'Over limit, blended high risk (70+)', action: 'Sales Manager then Finance Approval', level: 'FINANCE', color: 'purple' }
+    { condition: 'Over limit, blended high risk (70+) or margin < 25%', action: 'Sales Manager then Finance Approval', level: 'FINANCE', color: 'purple' }
   ]
 };
 
