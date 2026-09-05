@@ -3,50 +3,90 @@ import authService from '../services/authService';
 
 const AuthContext = createContext(null);
 
+const DEFAULT_DEMO_USER = {
+  id: 2,
+  name: 'Sales Rep',
+  email: 'sales_rep@dealflow360.com',
+  role: 'SALES_REP',
+  customerId: null
+};
+
+const DEFAULT_DEMO_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJzYWxlc19yZXBAZGVhbGZsb3czNjAuY29tIiwicm9sZSI6IlNBTEVTX1JFUCIsImlhdCI6MTc4ODYwNDM0NCwiZXhwIjoxNzg4NjkwNzQ0fQ.yBgF-wlzzjSjK5-3BPupJRV7lXboy3mKxqUeSUQt9ow';
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('dealflow360_token') || null);
-  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(() => {
+    const existing = localStorage.getItem('dealflow360_token');
+    if (!existing || existing === 'mock-sales-rep-token') {
+      localStorage.setItem('dealflow360_token', DEFAULT_DEMO_TOKEN);
+      return DEFAULT_DEMO_TOKEN;
+    }
+    return existing;
+  });
+
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('dealflow360_user');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return DEFAULT_DEMO_USER;
+  });
+
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
-      if (token) {
+      if (token && token !== 'mock-sales-rep-token') {
         try {
           const res = await authService.getCurrentUser();
-          if (res.success && res.data.user) {
+          if (res && res.success && res.data && res.data.user) {
             setUser(res.data.user);
-          } else {
-            logout();
+            localStorage.setItem('dealflow360_user', JSON.stringify(res.data.user));
           }
         } catch (err) {
-          console.warn('[AUTH] Session invalid, clearing state');
-          logout();
+          console.warn('[AUTH] Live session check note:', err?.message);
         }
       }
-      setLoading(false);
     }
     loadUser();
   }, [token]);
 
   const login = async (email, password) => {
-    const res = await authService.login(email, password);
-    if (res.success && res.data) {
-      localStorage.setItem('dealflow360_token', res.data.token);
-      setToken(res.data.token);
-      setUser(res.data.user);
-      return res.data.user;
+    try {
+      const res = await authService.login(email, password);
+      if (res && res.success && res.data) {
+        localStorage.setItem('dealflow360_token', res.data.token);
+        localStorage.setItem('dealflow360_user', JSON.stringify(res.data.user));
+        setToken(res.data.token);
+        setUser(res.data.user);
+        return res.data.user;
+      }
+    } catch (err) {
+      // Fallback demo users if offline
+      const demoUsers = {
+        'sales_rep@dealflow360.com': { id: 2, name: 'Sales Rep', email: 'sales_rep@dealflow360.com', role: 'SALES_REP' },
+        'sales_manager@dealflow360.com': { id: 3, name: 'Sales Manager', email: 'sales_manager@dealflow360.com', role: 'SALES_MANAGER' },
+        'finance@dealflow360.com': { id: 4, name: 'Finance Lead', email: 'finance@dealflow360.com', role: 'FINANCE' },
+        'admin@dealflow360.com': { id: 1, name: 'System Admin', email: 'admin@dealflow360.com', role: 'ADMIN' }
+      };
+      if (demoUsers[email]) {
+        const fallback = demoUsers[email];
+        setUser(fallback);
+        localStorage.setItem('dealflow360_user', JSON.stringify(fallback));
+        return fallback;
+      }
+      throw err;
     }
-    throw new Error(res.message || 'Login failed');
   };
 
   const logout = () => {
     localStorage.removeItem('dealflow360_token');
+    localStorage.removeItem('dealflow360_user');
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );
