@@ -95,6 +95,7 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       >
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<CustomerPortalDashboard />} />
         <Route path="negotiation/:id" element={<CustomerPortalDashboard />} />
       </Route>

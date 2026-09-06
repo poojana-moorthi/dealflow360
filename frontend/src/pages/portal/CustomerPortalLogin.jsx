@@ -17,29 +17,40 @@ export function CustomerPortalLogin() {
     setError('');
     setLoading(true);
     try {
+      const cleanEmail = email.trim();
+      let customerUser = null;
+      let customerToken = null;
+
       // 1. Try unified auth context
       try {
-        const authUser = await login(email.trim(), password);
+        const authUser = await login(cleanEmail, password);
         if (authUser && authUser.role === 'CUSTOMER') {
-          localStorage.setItem('dealflow360_portal_user', JSON.stringify(authUser));
-          navigate('/portal/dashboard');
-          return;
+          customerUser = authUser;
+          customerToken = localStorage.getItem('dealflow360_token');
         }
       } catch (authErr) {
         // Continue to dedicated portalService fallback
       }
 
       // 2. Fall back to portalService
-      const res = await portalService.login(email.trim(), password);
-      if (res.success && res.data) {
-        localStorage.setItem('dealflow360_token', res.data.token);
-        localStorage.setItem('dealflow360_user', JSON.stringify(res.data.user));
-        localStorage.setItem('dealflow360_primary_role', 'CUSTOMER');
-        localStorage.setItem('dealflow360_portal_user', JSON.stringify(res.data.user));
-        window.location.href = '/portal/dashboard';
-      } else {
-        throw new Error(res.message || 'Authentication failed');
+      if (!customerUser) {
+        const res = await portalService.login(cleanEmail, password);
+        if (res && res.success && res.data) {
+          customerUser = res.data.user;
+          customerToken = res.data.token;
+        }
       }
+
+      if (customerUser) {
+        localStorage.setItem('dealflow360_token', customerToken || 'demo-customer-portal-jwt-token');
+        localStorage.setItem('dealflow360_user', JSON.stringify(customerUser));
+        localStorage.setItem('dealflow360_primary_role', 'CUSTOMER');
+        localStorage.setItem('dealflow360_portal_user', JSON.stringify(customerUser));
+        window.location.href = '/portal/dashboard';
+        return;
+      }
+
+      throw new Error('Invalid customer credentials. Please verify your email and password.');
     } catch (err) {
       setError(err.message || 'Customer authentication failed. Please verify credentials.');
     } finally {

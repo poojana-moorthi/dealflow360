@@ -59,17 +59,24 @@ export function CustomerPortalDashboard() {
     }
   };
 
-  const loadQuoteDetail = async (id) => {
-    setDetailLoading(true);
+  const loadQuoteDetail = async (id, isSilent = false) => {
+    if (!isSilent) setDetailLoading(true);
     try {
       const res = await portalService.getQuotationDetail(id);
-      if (res && res.success) {
+      if (res && res.success && res.data) {
         setQuoteDetail(res.data);
+      } else if (!quoteDetail) {
+        const found = quotes.find(q => q.id === id) || quotes[0];
+        if (found) setQuoteDetail(found);
       }
     } catch (err) {
       console.error('[PORTAL] Error loading quote detail:', err);
+      if (!quoteDetail) {
+        const found = quotes.find(q => q.id === id) || quotes[0];
+        if (found) setQuoteDetail(found);
+      }
     } finally {
-      setDetailLoading(false);
+      if (!isSilent) setDetailLoading(false);
     }
   };
 
@@ -79,7 +86,7 @@ export function CustomerPortalDashboard() {
 
   useEffect(() => {
     if (selectedQuoteId) {
-      loadQuoteDetail(selectedQuoteId);
+      loadQuoteDetail(selectedQuoteId, false);
     }
   }, [selectedQuoteId]);
 
@@ -88,18 +95,18 @@ export function CustomerPortalDashboard() {
     const handlePortalUpdate = () => {
       loadQuotes();
       if (selectedQuoteId) {
-        loadQuoteDetail(selectedQuoteId);
+        loadQuoteDetail(selectedQuoteId, true);
       }
     };
     window.addEventListener('dealflow360_portal_update', handlePortalUpdate);
     window.addEventListener('storage', handlePortalUpdate);
 
-    // Fast polling to pick up any replies or revisions
+    // Fast silent polling to pick up any replies or revisions without interrupting UI
     const pollInterval = setInterval(() => {
       if (selectedQuoteId) {
-        loadQuoteDetail(selectedQuoteId);
+        loadQuoteDetail(selectedQuoteId, true);
       }
-    }, 3000);
+    }, 4000);
 
     return () => {
       window.removeEventListener('dealflow360_portal_update', handlePortalUpdate);

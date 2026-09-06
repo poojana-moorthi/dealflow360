@@ -135,7 +135,7 @@ export const portalService = {
   async getQuotations() {
     try {
       const res = await api.get('/portal/quotations');
-      if (res && res.success && Array.isArray(res.data)) {
+      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
         return res;
       }
     } catch (err) {
@@ -166,7 +166,7 @@ export const portalService = {
       customerQuotes = allQuotes.slice(0, 3);
     }
 
-    const sanitized = customerQuotes.map(sanitizeQuoteForCustomer);
+    const sanitized = customerQuotes.map(sanitizeQuoteForCustomer).filter(Boolean);
     return {
       success: true,
       data: sanitized
@@ -200,19 +200,21 @@ export const portalService = {
     const quote = (salesMockService.quotations || []).find(q => q.id === numId) || salesMockService.quotations[0];
     const sanitized = sanitizeQuoteForCustomer(quote);
 
-    // Merge default sales rep message with stored negotiations
-    const initialThread = [
-      {
-        id: 'init-1',
-        role: 'SALES_REP',
-        user_name: sanitized.sales_rep_name,
-        comment: 'Official proposal submitted for procurement review. Gold tier commercial pricing applied with volume discounts.',
-        created_at: sanitized.created_at
-      }
-    ];
+    if (sanitized) {
+      // Merge default sales rep message with stored negotiations
+      const initialThread = [
+        {
+          id: 'init-1',
+          role: 'SALES_REP',
+          user_name: sanitized.sales_rep_name || 'Alex Morgan',
+          comment: 'Official proposal submitted for procurement review. Gold tier commercial pricing applied with volume discounts.',
+          created_at: sanitized.created_at || new Date().toISOString()
+        }
+      ];
 
-    const storedNegs = getStoredNegotiations(sanitized.id);
-    sanitized.negotiations = [...storedNegs, ...initialThread];
+      const storedNegs = getStoredNegotiations(sanitized.id);
+      sanitized.negotiations = [...storedNegs, ...initialThread];
+    }
 
     return {
       success: true,

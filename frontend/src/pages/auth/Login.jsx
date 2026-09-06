@@ -88,7 +88,9 @@ export function Login() {
       const user = await login(identifier.trim(), password);
       if (user.role === 'CUSTOMER') {
         localStorage.setItem('dealflow360_portal_user', JSON.stringify(user));
-        navigate('/portal/dashboard');
+        localStorage.setItem('dealflow360_primary_role', 'CUSTOMER');
+        window.location.href = '/portal/dashboard';
+        return;
       } else if (user.role === 'FINANCE') {
         navigate('/finance');
       } else if (user.role === 'SALES_REP' || user.role === 'ADMIN') {

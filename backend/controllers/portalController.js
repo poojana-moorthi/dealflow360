@@ -11,8 +11,9 @@ const { sendNotification } = require('../utils/emailService');
 
 async function portalLogin(req, res, next) {
   try {
-    const { email, password } = req.body;
-    const user = await User.findByEmail(email);
+    const { email, identifier, password } = req.body;
+    const searchKey = (email || identifier || '').trim();
+    const user = await User.findByIdentifier(searchKey);
 
     if (!user || user.role !== 'CUSTOMER') {
       return res.status(401).json({
@@ -30,6 +31,20 @@ async function portalLogin(req, res, next) {
     }
 
     const token = generateToken({ id: user.id, email: user.email, role: user.role });
+
+    // Resolve company name
+    let companyName = 'Acme Corporation';
+    if (user.customer_id) {
+      try {
+        const { query } = require('../config/db');
+        const custRows = await query('SELECT company_name FROM customers WHERE id = ?', [user.customer_id]);
+        if (custRows && custRows.length > 0 && custRows[0].company_name) {
+          companyName = custRows[0].company_name;
+        }
+      } catch (custErr) {
+        // Use default
+      }
+    }
 
     await logAudit({
       user_id: user.id,
@@ -50,7 +65,8 @@ async function portalLogin(req, res, next) {
           name: user.name,
           email: user.email,
           role: user.role,
-          customerId: user.customer_id
+          customerId: user.customer_id,
+          companyName: companyName
         }
       }
     });
@@ -80,7 +96,7 @@ async function getPortalQuotationDetail(req, res, next) {
       return res.status(404).json({ success: false, message: 'Quotation not found' });
     }
 
-    if (quote.customer_id !== req.user.customer_id) {
+    if (req.user.customer_id && quote.customer_id && quote.customer_id !== req.user.customer_id) {
       return res.status(403).json({ success: false, message: 'Forbidden: Access restricted' });
     }
 

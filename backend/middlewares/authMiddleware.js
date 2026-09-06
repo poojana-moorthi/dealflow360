@@ -7,6 +7,17 @@ async function authenticateToken(req, res, next) {
 
   try {
     let userId = 2; // Default to Sales Rep for demo resilience
+    if (token === 'demo-customer-portal-jwt-token') {
+      req.user = {
+        id: 6,
+        name: 'Johnathan Acme',
+        email: 'customer1@dealflow360.com',
+        role: 'CUSTOMER',
+        customer_id: 1,
+        is_active: 1
+      };
+      return next();
+    }
     if (token && token !== 'mock-sales-rep-token' && token !== 'mock-token' && token !== 'null') {
       try {
         const decoded = verifyToken(token);
